@@ -1369,7 +1369,7 @@ def _top_chrome(slide, meta, category, palette, top_bar=False,
             bar_w = Inches(12.0)
             bar_h = Inches(0.05)
             track_color = PURPLE_MUTED if dark else LIGHT_GRAY
-            fill_color = MERCK_YELLOW if dark else MERCK_GOLD
+            fill_color = pal["hot"] if dark else pal["highlight"]
             hairline(slide, bar_x, bar_y, bar_w, bar_h, track_color)
             # Filled portion proportional to page / total. Min 1px visible.
             frac = max(0.0, min(1.0, p / t))
@@ -1409,10 +1409,15 @@ def _bottom_chrome(slide, meta, category, page, total, palette):
     deck_label = meta.get("deck_label", "")
     cat = category or ""
     left_parts = [p for p in [deck_label, cat] if p]
+    # On dark-background slides (merck_storytelling) Rich Purple is invisible —
+    # use a light off-white so the footer remains readable.
+    _ftr_dark = _is_dark(palette)
+    footer_color = MERCK_PURPLE if not _ftr_dark else PANEL_LIGHT
+
     if left_parts:
         txt(slide, Inches(0.65), FOOTER_TEXT_Y, Inches(10.0), Inches(0.20),
             "   •   ".join(left_parts), sz=8,
-            color=MERCK_PURPLE, bold=False,
+            color=footer_color, bold=False,
             font=FONT_BODY, anchor=MSO_ANCHOR.TOP)
 
     if page is not None:
@@ -1420,7 +1425,7 @@ def _bottom_chrome(slide, meta, category, page, total, palette):
         if total:
             page_text = f"{_pad_int(page)} / {_pad_int(total)}"
         txt(slide, Inches(12.0), FOOTER_TEXT_Y, Inches(1.0), Inches(0.20),
-            page_text, sz=8, color=MERCK_PURPLE,
+            page_text, sz=8, color=footer_color,
             bold=False, font=FONT_BODY, align=PP_ALIGN.RIGHT)
 
 
@@ -1436,36 +1441,25 @@ _ICON_DISPATCH = {
 def _section_marker(slide, number, category, palette, icon=None):
     """Numbered circle + uppercase category tag.
 
-    If icon is provided (e.g. 'lightbulb'), render the icon inside the circle
-    instead of a number. Used for exec summary and other slides where the
-    circle should anchor on a concept rather than a sequence position.
+    The circle is only drawn when it has visible content (a number or icon) —
+    an empty filled circle with nothing inside is omitted. The category tag
+    always renders independently of the circle.
     """
     dark = _is_dark(palette)
     circle_fill = MERCK_PURPLE if not dark else MERCK_YELLOW
     number_color = WHITE if not dark else INK_DARK
     tag_color = PURPLE_MUTED if not dark else MERCK_GOLD
 
-    circle(slide, SECTION_CIRCLE_X, SECTION_CIRCLE_Y,
-           SECTION_CIRCLE_D, fill=circle_fill)
-    if icon:
-        # Draw an icon inside the circle.
-        icon_fn_name = _ICON_DISPATCH.get(icon, None)
-        if icon_fn_name:
-            icon_fn = globals().get(icon_fn_name)
-            if icon_fn:
-                # Inset the icon ~30% from circle edge.
-                inset = SECTION_CIRCLE_D * 0.28
-                icon_size = SECTION_CIRCLE_D - inset * 2
-                icon_fn(slide,
-                        SECTION_CIRCLE_X + inset,
-                        SECTION_CIRCLE_Y + inset,
-                        icon_size, number_color)
-    elif number is not None and str(number) != "":
-        num_sz = 22 if len(str(number)) <= 2 else 14
-        txt(slide, SECTION_CIRCLE_X, SECTION_CIRCLE_Y,
-            SECTION_CIRCLE_D, SECTION_CIRCLE_D,
-            str(number), sz=num_sz, color=number_color, bold=True,
-            font=FONT_BODY, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+    has_number = number is not None and str(number) != ""
+    if has_number or icon:
+        circle(slide, SECTION_CIRCLE_X, SECTION_CIRCLE_Y,
+               SECTION_CIRCLE_D, fill=circle_fill)
+        if has_number:
+            num_sz = 22 if len(str(number)) <= 2 else 14
+            txt(slide, SECTION_CIRCLE_X, SECTION_CIRCLE_Y,
+                SECTION_CIRCLE_D, SECTION_CIRCLE_D,
+                str(number), sz=num_sz, color=number_color, bold=True,
+                font=FONT_BODY, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
     if category:
         txt(slide, SECTION_TAG_X, SECTION_TAG_Y,
             SECTION_TAG_W, SECTION_TAG_H,
@@ -1481,7 +1475,7 @@ def _render_action_title(slide, x, y, w, h, content, palette,
     if base_color is None:
         base_color = WHITE if dark else MERCK_PURPLE
     if italic_color is None:
-        italic_color = MERCK_YELLOW
+        italic_color = pal["hot"]
 
     box = slide.shapes.add_textbox(x, y, w, h)
     tf = box.text_frame
@@ -1491,6 +1485,12 @@ def _render_action_title(slide, x, y, w, h, content, palette,
     tf.margin_right = Inches(0.02)
     tf.margin_top = Inches(0.02)
     tf.margin_bottom = Inches(0.02)
+    # Auto-shrink font if the text is too long to fit — prevents visible clipping.
+    try:
+        from pptx.enum.text import MSO_AUTO_SIZE
+        tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+    except Exception:
+        pass
     p = tf.paragraphs[0]
     p.alignment = PP_ALIGN.LEFT
 
@@ -1768,7 +1768,7 @@ def stub_and_flag(slide, anchor_x, anchor_y, label, palette,
                   label_offset_y=Inches(-0.4)):
     """Draw a dot at the anchor, an elbow connector, and a small label."""
     pal = _palette_for(palette)
-    color = MERCK_GOLD if not _is_dark(palette) else MERCK_YELLOW
+    color = pal["highlight"] if not _is_dark(palette) else pal["hot"]
     dot_size = Inches(0.08)
     circle(slide, anchor_x - dot_size / 2, anchor_y - dot_size / 2,
            dot_size, fill=color)
@@ -1824,13 +1824,13 @@ def _draw_card(slide, x, y, w, h, palette, highlighted=False,
     if highlighted:
         card_fill = PURPLE_DEEP if _is_dark(palette) else MERCK_PURPLE
         body = rounded(slide, x, y, w, h, fill=card_fill)
-        stripe = stripe_color or MERCK_YELLOW
+        stripe = stripe_color or pal["hot"]
         rounded(slide, x, y, w, Inches(0.06), fill=stripe, adj=50000)
         return WHITE, PANEL_LIGHT, stripe
-    # Default card: cream panel + gold stripe + hairline border.
+    # Default card: panel fill + theme-accent stripe + hairline border.
     body = rounded(slide, x, y, w, h, fill=PANEL_LIGHT)
     _apply_border(body, LIGHT_GRAY, Pt(0.5))
-    stripe = stripe_color or MERCK_GOLD
+    stripe = stripe_color or pal["highlight"]
     rounded(slide, x, y, w, Inches(0.06), fill=stripe, adj=50000)
     return MERCK_PURPLE, INK_GRAY, stripe
 
@@ -1856,7 +1856,7 @@ def _bulleted_list(slide, x, y, w, h, items, palette,
     pal = _palette_for(palette)
     if text_color is None:
         text_color = pal["ink"]
-    bcol = bullet_color or MERCK_GOLD
+    bcol = bullet_color or pal["highlight"]
 
     box = slide.shapes.add_textbox(x, y, w, h)
     tf = box.text_frame
@@ -1904,15 +1904,16 @@ def _bulleted_list(slide, x, y, w, h, items, palette,
 
 def statement_card(slide, x, y, w, h, label, body, palette,
                    accent="left", stripe_color=None):
-    """Pale-lavender rounded statement card with a gold accent stripe.
+    """Pale-lavender rounded statement card with a theme-accent stripe.
 
-    accent="left" draws a vertical gold stripe down the left edge; accent="top"
-    draws a horizontal gold stripe across the top. Label sits at the top-left
-    inside the card in MERCK_GOLD uppercase tracked Verdana 10pt; body in
+    accent="left" draws a vertical stripe down the left edge; accent="top"
+    draws a horizontal stripe across the top. Label sits at the top-left
+    inside the card in theme accent colour uppercase tracked Verdana 10pt; body in
     INK_DARK Verdana 14pt bold (auto-shrinks to 13pt for longer bodies).
     """
+    pal = _palette_for(palette)
     fill = PANEL_LIGHT
-    stripe = stripe_color or MERCK_GOLD
+    stripe = stripe_color or pal["highlight"]
     card = rounded(slide, x, y, w, h, fill=fill)
     _apply_border(card, LIGHT_GRAY, Pt(0.5))
 
@@ -1932,7 +1933,7 @@ def statement_card(slide, x, y, w, h, label, body, palette,
 
     if label:
         txt(slide, text_inset_x, label_y, text_w, Inches(0.24),
-            _track_letters(label), sz=10, color=MERCK_GOLD, bold=True,
+            _track_letters(label), sz=10, color=pal["highlight"], bold=True,
             font=FONT_BODY)
     if body:
         body_sz = 14 if len(str(body)) <= 180 else 13
@@ -1948,12 +1949,13 @@ def statement_card(slide, x, y, w, h, label, body, palette,
 def in_slide_section(slide, y, label, palette, x=None, w=None, align="center"):
     """Render an in-slide sub-section heading.
 
-    Small MERCK_GOLD uppercase tracked Verdana 11pt label used to break a
+    Small theme-accent uppercase tracked Verdana 11pt label used to break a
     content zone into sub-sections (e.g. four cards, then THREE PILLARS
     heading, then three more cards).
     """
     if not label:
         return None
+    pal = _palette_for(palette)
     x_use = x if x is not None else Inches(0.65)
     w_use = w if w is not None else Inches(12.0)
     align_map = {
@@ -1963,7 +1965,7 @@ def in_slide_section(slide, y, label, palette, x=None, w=None, align="center"):
     }
     a = align_map.get(align, PP_ALIGN.CENTER)
     return txt(slide, x_use, y, w_use, Inches(0.28),
-               _track_letters(label), sz=11, color=MERCK_GOLD, bold=True,
+               _track_letters(label), sz=11, color=pal["highlight"], bold=True,
                font=FONT_BODY, align=a, anchor=MSO_ANCHOR.MIDDLE)
 
 
@@ -1978,6 +1980,7 @@ def _phase_progress(slide, phases, palette):
     """
     if not phases:
         return
+    pal = _palette_for(palette)
     dark = _is_dark(palette)
     n = len(phases)
     margin = Inches(0.65)
@@ -1993,13 +1996,13 @@ def _phase_progress(slide, phases, palette):
         current = bool(ph.get("current"))
         cx = margin + seg * i + seg / 2
         dot_d = Inches(0.20)
-        dot_color = MERCK_GOLD if current else PURPLE_MUTED
+        dot_color = pal["highlight"] if current else PURPLE_MUTED
         circle(slide, cx - dot_d / 2, cy - dot_d / 2, dot_d, fill=dot_color)
 
         label = ph.get("label", "")
         desc = ph.get("desc", "")
         label_color = (WHITE if dark else INK_DARK) if current else PURPLE_MUTED
-        desc_color = MERCK_GOLD if current else PURPLE_MUTED
+        desc_color = pal["highlight"] if current else PURPLE_MUTED
 
         # Label below the dot.
         label_y = cy + Inches(0.18)
@@ -2052,11 +2055,11 @@ def add_slope_chart(slide, x, y, w, h, before_label, after_label, items,
     # Gold "Before" / "After" headers at top of axes.
     txt(slide, left_axis - Inches(1.1), plot_top - Inches(0.55),
         Inches(2.2), Inches(0.30),
-        _tracked(before_label), sz=11, color=MERCK_GOLD, bold=True,
+        _tracked(before_label), sz=11, color=pal["highlight"], bold=True,
         font=FONT_BODY, align=PP_ALIGN.CENTER)
     txt(slide, right_axis - Inches(1.1), plot_top - Inches(0.55),
         Inches(2.2), Inches(0.30),
-        _tracked(after_label), sz=11, color=MERCK_GOLD, bold=True,
+        _tracked(after_label), sz=11, color=pal["highlight"], bold=True,
         font=FONT_BODY, align=PP_ALIGN.CENTER)
 
     # Axis hairlines.
@@ -2386,8 +2389,8 @@ def add_waterfall(slide, x, y, w, h, bars, palette):
             shown = f"-{abs(v):g}"
             label_above = False
             label_color = BAD_RED
-        else:  # up
-            color = MERCK_GOLD
+        else:  # up — GOOD_GREEN for positive/growth bars (CD traffic-light convention)
+            color = GOOD_GREEN
             shown = f"+{v:g}"
             label_above = True
             label_color = MERCK_PURPLE
@@ -2450,7 +2453,7 @@ def add_small_multiples(slide, x, y, w, h, datasets, palette, grid=(2, 3)):
         # Cell chrome.
         card = rounded(slide, cx, cy, cell_w, cell_h, fill=PANEL_LIGHT)
         _apply_border(card, LIGHT_GRAY, Pt(0.5))
-        rect(slide, cx, cy, cell_w, Inches(0.04), fill=MERCK_GOLD)
+        rect(slide, cx, cy, cell_w, Inches(0.04), fill=pal["highlight"])
 
         title = ds[0]
         values = list(ds[1] or [])
@@ -2498,7 +2501,7 @@ def add_small_multiples(slide, x, y, w, h, datasets, palette, grid=(2, 3)):
             # End dot (highlight).
             dot = Inches(0.10)
             circle(slide, pts[-1][0] - dot / 2, pts[-1][1] - dot / 2,
-                   dot, fill=MERCK_GOLD)
+                   dot, fill=pal["highlight"])
             # Endpoint value label, placed inside the cell.
             label_w = Inches(0.70)
             lx = pts[-1][0] - label_w + Inches(0.05)
@@ -2590,10 +2593,9 @@ def add_simple_bar(slide, x, y, w, h, items=None, palette=None,
     # Color each series.  For a single series use the highlight logic;
     # for multiple series rotate through the Merck palette.
     # ------------------------------------------------------------------
-    _MULTI_SERIES_COLORS = [
-        MERCK_PURPLE, MERCK_GOLD, MERCK_BLUE, GOOD_GREEN,
-        BAD_RED, MERCK_AQUA, PURPLE_MUTED, MERCK_YELLOW,
-    ]
+    # Use the official Merck Corporate Design 12-color chart palette so
+    # multi-series charts follow CD specifications (orange / teal / dark-cyan …).
+    _MULTI_SERIES_COLORS = CHART_PALETTE
     for si, s_obj in enumerate(chart.series):
         series_color = _MULTI_SERIES_COLORS[si % len(_MULTI_SERIES_COLORS)]
         try:
@@ -2642,8 +2644,9 @@ def add_simple_bar(slide, x, y, w, h, items=None, palette=None,
 # Chart dispatcher used by build_chart_slide
 
 def _render_chart(slide, chart, x, y, w, h, palette):
+    """Render chart content onto slide. Returns True if a chart was drawn."""
     if not chart:
-        return
+        return False
     ctype = chart.get("type", "column")
     data = chart.get("data", {})
 
@@ -2654,18 +2657,23 @@ def _render_chart(slide, chart, x, y, w, h, palette):
                         data.get("items", []),
                         palette,
                         highlight_indices=data.get("highlight_indices"))
+        return True
     elif ctype == "dot":
         add_dot_plot(slide, x, y, w, h,
                      data.get("categories", ["0", "25", "50", "75", "100"]),
                      data.get("items", []), palette)
+        return True
     elif ctype == "marimekko":
         add_marimekko(slide, x, y, w, h, data.get("columns", []), palette)
+        return True
     elif ctype == "waterfall":
         add_waterfall(slide, x, y, w, h, data.get("bars", []), palette)
+        return True
     elif ctype == "small_multiples":
         add_small_multiples(slide, x, y, w, h,
                             data.get("datasets", []), palette,
                             grid=tuple(data.get("grid", (2, 3))))
+        return True
     elif ctype in ("bar", "column", "line"):
         # Standard {categories, series} format — preferred for LLM-generated plans.
         # Falls back to legacy [label, value] items format when series is absent.
@@ -2680,6 +2688,7 @@ def _render_chart(slide, chart, x, y, w, h, palette):
                            horizontal=(ctype == "bar"),
                            highlight_index=data.get("highlight_index"),
                            chart_type_name=ctype)
+            return True
         elif legacy_items:
             add_simple_bar(slide, x, y, w, h,
                            items=legacy_items,
@@ -2687,11 +2696,13 @@ def _render_chart(slide, chart, x, y, w, h, palette):
                            horizontal=(ctype == "bar"),
                            highlight_index=data.get("highlight_index"),
                            chart_type_name=ctype)
+            return True
         else:
             import sys
             print(f"WARNING: chart_slide received type='{ctype}' but no "
                   f"'series'+'categories' or 'items' data found — slide "
                   f"will render without a chart.", file=sys.stderr)
+            return False
     else:
         # Unknown type: attempt legacy items format and warn.
         import sys
@@ -2701,9 +2712,11 @@ def _render_chart(slide, chart, x, y, w, h, palette):
                            items=items, palette=palette,
                            horizontal=bool(data.get("horizontal", False)),
                            highlight_index=data.get("highlight_index"))
+            return True
         else:
             print(f"WARNING: chart_slide received unknown chart type "
                   f"'{ctype}' with no renderable data.", file=sys.stderr)
+            return False
 
 
 # ===========================================================================
@@ -2711,6 +2724,10 @@ def _render_chart(slide, chart, x, y, w, h, palette):
 # ===========================================================================
 
 def _style_or_promote(category, style):
+    # Never override an explicit storytelling style — visual consistency
+    # across the deck matters more than per-category promotion.
+    if style == "merck_storytelling":
+        return style
     if category and str(category) in AUTO_PROMOTE_EXECUTIVE:
         return "merck_executive"
     return style
@@ -2722,7 +2739,15 @@ def _tone_color(tone, palette):
     if tone == "negative":
         return BAD_RED
     v = str(tone).strip().lower()
-    if v in ("red", "r", "amber", "yellow", "a", "green", "g", "good"):
+    # Decision-row semantic tones (plan schema: approve / discuss / note).
+    if v in ("approve", "approved", "yes", "accept", "green", "g", "good"):
+        return GOOD_GREEN
+    if v in ("discuss", "review", "consider", "pending", "open",
+             "amber", "yellow", "a"):
+        return MERCK_YELLOW
+    if v in ("note", "fyi", "info", "neutral", "observation"):
+        return PURPLE_MUTED
+    if v in ("red", "r"):
         from_rag = _rag_color(tone)
         return from_rag
     return MERCK_PURPLE
@@ -2917,12 +2942,26 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
             except Exception:
                 pass
 
+        # Theme-dependent body text color for subtitle / name-date placeholders.
+        # The USA template can inherit teal from its theme master; explicitly
+        # override so these placeholders always use a CD-compliant neutral.
+        _cover_dark = theme_lower in ("synthetic", "electronics")
+        _body_color = PANEL_LIGHT if _cover_dark else INK_GRAY
+
         # Populate subtitle placeholder (idx 1) with subtitle_part if the
         # slide had no explicit subtitle and the title contained a ';' split.
         if subtitle_part and not subtitle:
             subtitle = subtitle_part
         if subtitle:
-            _populate_placeholder(1, slide, subtitle)
+            ph_sub = _populate_placeholder(1, slide, subtitle,
+                                           font=FONT_BODY, color=_body_color)
+            if ph_sub is not None and ph_sub.has_text_frame:
+                ph_sub.text_frame.word_wrap = True
+                try:
+                    from pptx.enum.text import MSO_AUTO_SIZE
+                    ph_sub.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+                except Exception:
+                    pass
         # Name/Date placeholder (idx 10): two lines (author name; month/year).
         name_line = ""
         if authors:
@@ -2934,7 +2973,8 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
         date_line = (meta or {}).get("month_year", "")
         nd_text = "\n".join(s for s in [name_line, date_line] if s)
         if nd_text:
-            _populate_placeholder(10, slide, nd_text)
+            _populate_placeholder(10, slide, nd_text,
+                                  font=FONT_BODY, color=_body_color)
         return slide
 
     # Fallback: no themed base. Build the cover from scratch (legacy path).
@@ -2982,9 +3022,9 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
                              Inches(12.0), Inches(1.70), title, style,
                              size=44, italic_color=MERCK_YELLOW,
                              base_color=MERCK_PURPLE)
-        # Gold accent rule under title.
+        # Theme-accent rule under title.
         hairline(slide, Inches(0.65), Inches(3.55), Inches(2.6),
-                 Emu(int(Pt(2.5))), MERCK_GOLD)
+                 Emu(int(Pt(2.5))), pal["highlight"])
         # Subtitle gray italic.
         if subtitle:
             txt(slide, Inches(0.65), Inches(3.75), Inches(12.0), Inches(0.50),
@@ -3041,15 +3081,13 @@ def build_exec_summary(prs, meta, action_title=None, key_messages=None, takeaway
     style = _style_or_promote(category or "Executive Summary", style)
     pal = _palette_for(style)
     slide = _new_slide(prs, bg_color=pal["bg"])
-    # Exec summary circle uses a lightbulb icon (key takeaways), not a number.
     apply_chrome(slide, meta, action_title,
                  category="Executive Summary",
                  subtitle=subtitle,
                  takeaway=takeaway,
                  source=source, page=page, total=total, palette=style,
                  section_number=section_number,
-                 methodology_note=methodology_note,
-                 section_icon="lightbulb")
+                 methodology_note=methodology_note)
 
     items = (key_messages or [])[:5]
     n = max(len(items), 1)
@@ -3103,20 +3141,21 @@ def build_agenda(prs, meta, chapters=None, style="merck_executive",
     dark = _is_dark(style)
     title_color = WHITE if dark else MERCK_PURPLE
     title_text = action_title if action_title else "INDEX"
-    txt(slide, Inches(0.65), Inches(1.30), Inches(12.0), Inches(0.90),
-        str(title_text).upper(), sz=44, color=title_color, bold=True,
-        font=FONT_HEAD)
-    sub_color = PANEL_LIGHT if dark else INK_GRAY
-    txt(slide, Inches(0.65), Inches(2.25), Inches(12.0), Inches(0.40),
-        "What we'll cover.", sz=14, color=sub_color, italic=True,
-        font=FONT_BODY)
+    heading_box = txt(slide, Inches(0.65), Inches(1.30), Inches(12.0), Inches(1.20),
+                      str(title_text).upper(), sz=44, color=title_color, bold=True,
+                      font=FONT_HEAD)
+    try:
+        from pptx.enum.text import MSO_AUTO_SIZE
+        heading_box.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+    except Exception:
+        pass
 
     items = (chapters or [])[:12]
     if not items:
         return slide
     # Two-column layout (left half + right half).
     half = len(items) // 2 + len(items) % 2
-    col_top = Inches(2.95)
+    col_top = Inches(2.80)  # heading box ends at 1.30+1.20=2.50; 0.30 gap
     col_h = Inches(3.95)
     col_w = (Inches(12.0) - Inches(0.50)) / 2
     row_gap = Inches(0.12)
@@ -3139,8 +3178,9 @@ def build_agenda(prs, meta, chapters=None, style="merck_executive",
             # Number in purple bold. Named with the chapter number so the
             # canonical runner can attach a slide-jump hyperlink in a
             # post-pass after all target slides exist.
+            num_color   = MERCK_PURPLE if not dark else pal["hot"]
             num_shape = txt(slide, x0, ry, Inches(0.60), Inches(0.40),
-                str(number), sz=title_sz, color=MERCK_PURPLE, bold=True,
+                str(number), sz=title_sz, color=num_color, bold=True,
                 font=FONT_BODY)
             try:
                 num_shape.name = f"AgendaChapter_{number}"
@@ -3152,7 +3192,9 @@ def build_agenda(prs, meta, chapters=None, style="merck_executive",
             title_shape = txt(slide, x0 + Inches(0.55), ry,
                 col_w - Inches(0.55),
                 title_h,
-                title, sz=title_sz, color=INK_DARK, bold=True, font=FONT_BODY)
+                title, sz=title_sz,
+                color=INK_DARK if not dark else WHITE,
+                bold=True, font=FONT_BODY)
             try:
                 title_shape.name = f"AgendaChapter_{number}"
             except Exception:
@@ -3163,8 +3205,9 @@ def build_agenda(prs, meta, chapters=None, style="merck_executive",
                 txt(slide, x0 + Inches(0.55), sub_y,
                     col_w - Inches(0.55),
                     sub_h,
-                    sub, sz=sub_sz, color=INK_GRAY, italic=True,
-                    font=FONT_BODY)
+                    sub, sz=sub_sz,
+                    color=INK_GRAY if not dark else PANEL_LIGHT,
+                    italic=True, font=FONT_BODY)
     _draw_col(rows_left, Inches(0.65))
     _draw_col(rows_right, Inches(0.65) + col_w + Inches(0.50))
     return slide
@@ -3222,9 +3265,23 @@ def build_section_divider(prs, meta, number=None, title=None, style="merck_execu
         slide = prs.slides.add_slide(divider_layout)
         # Populate number placeholder (idx 0).
         if num_str:
-            _populate_placeholder(0, slide, num_str)
+            ph0 = _populate_placeholder(0, slide, num_str)
+            if ph0 is not None and ph0.has_text_frame:
+                ph0.text_frame.word_wrap = True
+                try:
+                    from pptx.enum.text import MSO_AUTO_SIZE
+                    ph0.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+                except Exception:
+                    pass
         # Populate chapter title placeholder (idx 13).
-        _populate_placeholder(13, slide, str(title))
+        ph13 = _populate_placeholder(13, slide, str(title))
+        if ph13 is not None and ph13.has_text_frame:
+            ph13.text_frame.word_wrap = True
+            try:
+                from pptx.enum.text import MSO_AUTO_SIZE
+                ph13.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+            except Exception:
+                pass
         # Add bottom chrome (classification + page number).
         _bottom_chrome(slide, meta, "Section", page, total, style)
         return slide
@@ -3378,8 +3435,14 @@ def build_chart_slide(prs, meta, action_title=None, chart=None, takeaway=None,
 
     chart_y = Inches(2.85) if subtitle else Inches(2.50)
     chart_h = Inches(6.50) - chart_y
-    _render_chart(slide, chart, Inches(0.65), chart_y, Inches(12.0), chart_h,
-                  style)
+    chart_rendered = _render_chart(slide, chart, Inches(0.65), chart_y,
+                                   Inches(12.0), chart_h, style)
+    if not chart_rendered:
+        # Show a placeholder instead of a silently blank content area.
+        txt(slide, Inches(0.65), chart_y + Inches(0.50), Inches(12.0),
+            Inches(1.20),
+            "[Chart data not available — populate chart.type and chart.data in the plan]",
+            sz=13, color=INK_GRAY, italic=True, font=FONT_BODY)
 
     # Auto-fallback callout when none provided.
     effective_callouts = callouts
@@ -3389,9 +3452,19 @@ def build_chart_slide(prs, meta, action_title=None, chart=None, takeaway=None,
             effective_callouts = [auto]
     if effective_callouts:
         for c in effective_callouts:
-            stub_and_flag(slide, c.get("x", Inches(6.0)),
-                          c.get("y", Inches(3.5)),
-                          c.get("label", ""), style,
+            if c.get("x") is not None or c.get("y") is not None:
+                # Slide-absolute EMU coordinates (from _auto_callout_for_chart or
+                # hand-crafted plans that use the internal x/y keys directly).
+                cx = c.get("x") or Inches(6.0)
+                cy = c.get("y") or chart_y + Inches(1.5)
+            else:
+                # LLM plan schema: x_in/y_in are chart-relative float inches.
+                # Add chart_y so the annotation lands inside the chart area, not
+                # on top of the action title (which sits above chart_y).
+                cx = Inches(float(c.get("x_in", 6.0)))
+                cy = chart_y + Inches(float(c.get("y_in", 1.5)))
+            stub_and_flag(slide, cx, cy,
+                          c.get("label") or c.get("text", ""), style,
                           direction=c.get("direction", "up_right"))
 
     # Footnotes block above the source line (chrome already drew source/takeaway).
@@ -3497,11 +3570,12 @@ def _two_or_three_column_card(slide, x, y, w, h, col, palette):
 
     Both normal and highlighted cards use PANEL_LIGHT fill. The PURPLE_DEEP
     header bar blends into the card chrome. A small dot signals tone:
-    PURPLE_MUTED (neutral/normal) or MERCK_YELLOW (highlighted).
+    PURPLE_MUTED (neutral/normal) or theme hot colour (highlighted).
 
     Highlight derives from tone="positive" automatically.
     An explicit "highlighted" key overrides tone when present.
     """
+    pal = _palette_for(palette)
     if "highlighted" in col:
         highlighted = bool(col["highlighted"])
     else:
@@ -3519,7 +3593,7 @@ def _two_or_three_column_card(slide, x, y, w, h, col, palette):
     rect(slide, x, y, w, HDR_H, fill=bar_fill)
 
     # Tone dot
-    dot_col = MERCK_YELLOW if highlighted else PURPLE_MUTED
+    dot_col = pal["hot"] if highlighted else PURPLE_MUTED
     dot_x   = x + Inches(0.16)
     dot_y   = y + (HDR_H - DOT_SZ) / 2
     circle(slide, dot_x, dot_y, DOT_SZ, fill=dot_col)
@@ -3527,10 +3601,15 @@ def _two_or_three_column_card(slide, x, y, w, h, col, palette):
     # Label text on bar — accept "label" (internal name) or "header" (schema name).
     label = col.get("label") or col.get("header", "")
     if label:
-        txt(slide, dot_x + DOT_SZ + Inches(0.10), y,
-            w - DOT_SZ - Inches(0.40), HDR_H,
-            _tracked(label), sz=9, color=lbl_col, bold=True,
-            font=FONT_BODY, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.MIDDLE)
+        hdr_box = txt(slide, dot_x + DOT_SZ + Inches(0.10), y,
+                      w - DOT_SZ - Inches(0.40), HDR_H,
+                      _tracked(label), sz=9, color=lbl_col, bold=True,
+                      font=FONT_BODY, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.MIDDLE)
+        try:
+            from pptx.enum.text import MSO_AUTO_SIZE
+            hdr_box.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+        except Exception:
+            pass
 
     # Body content below the bar
     pad   = Inches(0.20)
@@ -3556,7 +3635,7 @@ def _two_or_three_column_card(slide, x, y, w, h, col, palette):
         _bulleted_list(slide, x + pad, cur_y, w - pad * 2,
                        max(avail_h, Inches(0.30)),
                        items, palette, text_color=INK_DARK, sz=11,
-                       bullet_color=MERCK_GOLD)
+                       bullet_color=pal["highlight"])
 
     # Timestamp pill at bottom
     ts = col.get("timestamp")
@@ -3566,7 +3645,7 @@ def _two_or_three_column_card(slide, x, y, w, h, col, palette):
         pill_x = x + pad
         pill_y = y + h - pill_h - Inches(0.18)
         rect(slide, pill_x, pill_y, pill_w, pill_h,
-             fill=MERCK_YELLOW if highlighted else PURPLE_MUTED)
+             fill=pal["hot"] if highlighted else PURPLE_MUTED)
         txt(slide, pill_x, pill_y, pill_w, pill_h,
             str(ts), sz=10,
             color=PURPLE_DEEP if highlighted else WHITE,
@@ -3732,17 +3811,17 @@ def build_2x2_matrix(prs, meta, action_title=None, x_axis=None, y_axis=None, qua
         if highlighted:
             quad_fill = PURPLE_DEEP if _is_dark(style) else MERCK_PURPLE
             rounded(slide, cx, cy, cell_w, cell_h, fill=quad_fill)
-            rounded(slide, cx, cy, cell_w, Inches(0.06), fill=MERCK_YELLOW, adj=50000)
+            rounded(slide, cx, cy, cell_w, Inches(0.06), fill=pal["hot"], adj=50000)
             tcolor = WHITE
             btext = PANEL_LIGHT
-            label_color = MERCK_YELLOW
+            label_color = pal["hot"]
         else:
             cell = rounded(slide, cx, cy, cell_w, cell_h, fill=PANEL_LIGHT)
             _apply_border(cell, LIGHT_GRAY, Pt(0.5))
-            rounded(slide, cx, cy, cell_w, Inches(0.06), fill=MERCK_GOLD, adj=50000)
+            rounded(slide, cx, cy, cell_w, Inches(0.06), fill=pal["highlight"], adj=50000)
             tcolor = MERCK_PURPLE
             btext = INK_DARK
-            label_color = MERCK_GOLD
+            label_color = pal["highlight"]
         label = q.get("label", "")
         items = q.get("items") or q.get("bullets") or []
         body  = q.get("body", "")
@@ -3780,7 +3859,7 @@ def build_2x2_matrix(prs, meta, action_title=None, x_axis=None, y_axis=None, qua
     x_ax = x_axis or {}
     y_ax = y_axis or {}
     txt(slide, plot_x, plot_y + plot_h + Inches(0.08), plot_w, Inches(0.26),
-        _tracked(x_ax.get("label", "")), sz=10, color=MERCK_GOLD, bold=True,
+        _tracked(x_ax.get("label", "")), sz=10, color=pal["highlight"], bold=True,
         font=FONT_BODY, align=PP_ALIGN.CENTER)
     txt(slide, plot_x, plot_y + plot_h + Inches(0.30), Inches(1.5),
         Inches(0.22),
@@ -3790,7 +3869,7 @@ def build_2x2_matrix(prs, meta, action_title=None, x_axis=None, y_axis=None, qua
         x_ax.get("high", ""), sz=9, color=PURPLE_MUTED, font=FONT_BODY,
         align=PP_ALIGN.RIGHT)
     txt(slide, Inches(0.65), plot_y, margin_left, plot_h,
-        _tracked(y_ax.get("label", "")), sz=10, color=MERCK_GOLD, bold=True,
+        _tracked(y_ax.get("label", "")), sz=10, color=pal["highlight"], bold=True,
         font=FONT_BODY, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
     return slide
 
@@ -3873,7 +3952,7 @@ def build_phase_process(prs, meta, action_title=None, phases=None, takeaway=None
         crumb_parts.append(_tracked(lbl))
     crumb = "   →   ".join(crumb_parts)
     txt(slide, Inches(0.65), zone_top, total_w, breadcrumb_h,
-        crumb, sz=10, color=MERCK_GOLD, bold=True, font=FONT_BODY,
+        crumb, sz=10, color=pal["highlight"], bold=True, font=FONT_BODY,
         anchor=MSO_ANCHOR.MIDDLE)
 
     for i, ph in enumerate(phs):
@@ -3892,7 +3971,7 @@ def build_phase_process(prs, meta, action_title=None, phases=None, takeaway=None
 
         pad = Inches(0.20)
         # Tiny step label inside card top.
-        label_color = MERCK_YELLOW if highlighted else MERCK_GOLD
+        label_color = pal["hot"] if highlighted else pal["highlight"]
         sub_color = WHITE if highlighted else INK_GRAY
         title_color = WHITE if highlighted else MERCK_PURPLE
         txt(slide, cx + pad, cy + Inches(0.20), card_w - pad * 2,
@@ -3936,7 +4015,7 @@ def build_phase_process(prs, meta, action_title=None, phases=None, takeaway=None
             if ms_is_long:
                 cap_h = Inches(0.80)
                 cap_y = cy + cards_h - cap_h - Inches(0.10)
-                cap_color = MERCK_YELLOW if highlighted else MERCK_GOLD
+                cap_color = pal["hot"] if highlighted else pal["highlight"]
                 txt(slide, block_x, cap_y, block_w, cap_h,
                     ms_text, sz=9, color=cap_color, italic=True, bold=True,
                     font=FONT_BODY, align=PP_ALIGN.LEFT,
@@ -3949,7 +4028,7 @@ def build_phase_process(prs, meta, action_title=None, phases=None, takeaway=None
                         pill_fill = PURPLE_DEEP
                         pill_text = WHITE
                     else:
-                        pill_fill = MERCK_YELLOW
+                        pill_fill = pal["hot"]
                         pill_text = PURPLE_DEEP
                 else:
                     if _is_dark(style):
@@ -3974,7 +4053,7 @@ def build_phase_process(prs, meta, action_title=None, phases=None, takeaway=None
             arrow = slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW,
                                            ar_x, ar_y, ar_w, ar_h)
             arrow.shadow.inherit = False
-            _apply_fill(arrow, MERCK_GOLD)
+            _apply_fill(arrow, pal["highlight"])
             _apply_border(arrow, None)
     return slide
 
@@ -4003,6 +4082,10 @@ def build_vertical_numbered(prs, meta, action_title=None, items=None, takeaway=N
 
     rows = (items or [])[:5]
     n = max(len(rows), 1)
+    # Scale number and title font sizes down for dense layouts so badges
+    # don't overflow into adjacent rows.
+    num_sz   = 34 if n >= 5 else (38 if n == 4 else 44)
+    title_sz = 13 if n >= 5 else (14 if n == 4 else 15)
     zone_top = Inches(2.95) if subtitle else Inches(2.55)
     zone_h = Inches(6.50) - zone_top
     gap = Inches(0.12)
@@ -4010,14 +4093,14 @@ def build_vertical_numbered(prs, meta, action_title=None, items=None, takeaway=N
     for i, row in enumerate(rows):
         ry = zone_top + i * (row_h + gap)
         num_w = Inches(0.90)
-        # Big serif number in MERCK_PURPLE.
+        # Number badge in MERCK_PURPLE.
         txt(slide, Inches(0.65), ry, num_w, row_h, str(i + 1),
-            sz=44, color=MERCK_PURPLE, bold=True, font=FONT_BODY,
+            sz=num_sz, color=MERCK_PURPLE, bold=True, font=FONT_BODY,
             anchor=MSO_ANCHOR.TOP)
         bx = Inches(0.65) + num_w + Inches(0.25)
         bw = Inches(12.0) - num_w - Inches(0.35)
         txt(slide, bx, ry + Inches(0.04), bw, Inches(0.36),
-            row.get("title", ""), sz=15, color=INK_DARK, bold=True,
+            row.get("title", ""), sz=title_sz, color=INK_DARK, bold=True,
             font=FONT_BODY)
         txt(slide, bx, ry + Inches(0.42), bw, row_h - Inches(0.46),
             row.get("body", ""), sz=11, color=INK_GRAY, font=FONT_BODY)
@@ -4089,12 +4172,12 @@ def build_decision_rows(prs, meta, action_title=None, decisions=None, takeaway=N
     row_h = (zone_h - gap * (n - 1)) / n
     for i, d in enumerate(rows):
         ry = zone_top + i * (row_h + gap)
-        # Card chrome (panel + hairline + gold stripe on top).
+        # Card chrome (panel + hairline + theme-accent stripe on top).
         card = rect(slide, Inches(0.65), ry, Inches(12.0), row_h,
                     fill=PANEL_LIGHT)
         _apply_border(card, LIGHT_GRAY, Pt(0.5))
         rect(slide, Inches(0.65), ry, Inches(12.0), Inches(0.06),
-             fill=MERCK_GOLD)
+             fill=pal["highlight"])
         # Number circle.
         tone = d.get("tone", "neutral")
         tone_color = _tone_color(tone, style)
@@ -4158,7 +4241,7 @@ def build_gantt(prs, meta, action_title=None, rows=None, quarters=None, takeaway
     col_w = grid_w / qn_count
     for i, q in enumerate(qs):
         txt(slide, grid_x + i * col_w, header_y, col_w, header_h,
-            _tracked(str(q)), sz=10, color=MERCK_GOLD, bold=True,
+            _tracked(str(q)), sz=10, color=pal["highlight"], bold=True,
             font=FONT_BODY, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
         line(slide, grid_x + i * col_w, header_y + header_h,
              grid_x + i * col_w, zone_top + zone_h,
@@ -4227,7 +4310,7 @@ def build_hero_stat(prs, meta, stat=None, context=None, source=None, category=No
     label = stat.get("label", "")
 
     dark = _is_dark(style)
-    number_color = MERCK_YELLOW if dark else MERCK_PURPLE
+    number_color = pal["hot"] if dark else MERCK_PURPLE
     label_color = WHITE if dark else INK_DARK
     context_color = PANEL_LIGHT if dark else INK_GRAY
 
@@ -4240,11 +4323,11 @@ def build_hero_stat(prs, meta, stat=None, context=None, source=None, category=No
         label, sz=18, color=label_color, font=FONT_BODY,
         align=PP_ALIGN.CENTER)
     if context:
-        txt(slide, Inches(0.65), Inches(5.35), Inches(12.0), Inches(0.80),
+        txt(slide, Inches(0.65), Inches(5.25), Inches(12.0), Inches(1.30),
             context, sz=13, color=context_color, italic=True,
             font=FONT_BODY, align=PP_ALIGN.CENTER)
-    # Gold accent rule under the number.
-    rule_color = MERCK_GOLD if not dark else MERCK_GOLD
+    # Theme-accent rule under the number.
+    rule_color = pal["highlight"]
     hairline(slide,
              Inches(6.665) - Inches(1.2), Inches(4.55),
              Inches(2.4), Emu(int(Pt(2.5))), rule_color)
@@ -4279,31 +4362,42 @@ def build_close(prs, meta, action_statement=None, style="merck_executive",
     _bottom_chrome(slide, meta, "Close", None, None, style)
 
     dark = _is_dark(style)
-    rule_color = MERCK_GOLD
+    rule_color = pal["highlight"]
     text_color = WHITE if dark else MERCK_PURPLE
 
     # Gold accent rule above.
     hairline(slide, Inches(0.65), Inches(2.80), Inches(2.6),
              Emu(int(Pt(2.5))), rule_color)
-    # Action statement in italic Merck Web. Supports either a string OR a list
-    # of (text, italic_bool) tuples for italic-emphasis runs.
+
+    # Action statement text box — use the full safe zone from rule to source line.
+    stmt_top = Inches(3.10)
+    stmt_h   = SOURCE_Y - Inches(0.15) - stmt_top  # ≈ 3.30 in (3.10 → 6.40)
+
+    # Adaptive font: scale down for long statements so text fits without clipping.
+    _stmt = action_statement or ""
+    _n = (len(_stmt) if isinstance(_stmt, str)
+          else sum(len(s) for s, _ in _stmt if isinstance(s, str)))
+    sz_stmt = 38 if _n <= 100 else (28 if _n <= 200 else 20)
+
+    # Action statement in italic display font. Supports either a string OR a list
+    # of (text, italic_bool) tuples for mixed-emphasis runs.
     if isinstance(action_statement, (list, tuple)) and action_statement and \
        all(isinstance(seg, (list, tuple)) and len(seg) == 2
            for seg in action_statement):
-        box = slide.shapes.add_textbox(Inches(0.65), Inches(3.10),
-                                       Inches(12.0), Inches(2.40))
+        box = slide.shapes.add_textbox(Inches(0.65), stmt_top,
+                                       Inches(12.0), stmt_h)
         tf = box.text_frame
         tf.word_wrap = True
         tf.margin_left = Inches(0.02)
         tf.margin_right = Inches(0.02)
         p = tf.paragraphs[0]
         for seg_text, seg_italic in action_statement:
-            seg_color = MERCK_YELLOW if seg_italic else text_color
-            _add_run(p, seg_text, sz=38, color=seg_color, bold=True,
+            seg_color = pal["hot"] if seg_italic else text_color
+            _add_run(p, seg_text, sz=sz_stmt, color=seg_color, bold=True,
                      italic=True, font=FONT_HEAD)
     else:
-        txt(slide, Inches(0.65), Inches(3.10), Inches(12.0), Inches(2.40),
-            action_statement or "", sz=38, color=text_color, italic=True,
+        txt(slide, Inches(0.65), stmt_top, Inches(12.0), stmt_h,
+            action_statement or "", sz=sz_stmt, color=text_color, italic=True,
             bold=True, font=FONT_HEAD)
     # Small tagline beneath: deck label + month/year.
     deck_label = (meta or {}).get("deck_label", "")
@@ -4377,10 +4471,10 @@ def build_stat_strip(prs, meta, action_title=None, stats=None, takeaway=None,
     for i, s in enumerate(cards):
         cx = CONTENT_X + i * (card_w + gutter)
         cy = zone_top
-        # Cream card with gold top stripe + hairline border.
+        # Cream card with theme-accent top stripe + hairline border.
         body = rounded(slide, cx, cy, card_w, card_h, fill=PANEL_LIGHT)
         _apply_border(body, LIGHT_GRAY, Pt(0.5))
-        rounded(slide, cx, cy, card_w, Inches(0.06), fill=MERCK_GOLD, adj=50000)
+        rounded(slide, cx, cy, card_w, Inches(0.06), fill=pal["highlight"], adj=50000)
 
         pad = Inches(0.22)
         # Big hero number — font size scales with string length to prevent overlap.
@@ -4397,14 +4491,14 @@ def build_stat_strip(prs, meta, action_title=None, stats=None, takeaway=None,
             val_str, sz=val_sz, color=MERCK_PURPLE, bold=True,
             font=FONT_HEAD, anchor=MSO_ANCHOR.TOP)
 
-        # Tracked uppercase label in gold.
+        # Tracked uppercase label in theme accent.
         # Tracking is skipped for labels > 12 chars to prevent mid-word wrapping.
         label = s.get("label", "")
         label_y = num_y + num_h + Inches(0.06)
         label_h = Inches(0.40)
         label_text = _track_letters(label) if len(label) <= 12 else label.upper()
         txt(slide, cx + pad, label_y, card_w - pad * 2, label_h,
-            label_text, sz=10, color=MERCK_GOLD, bold=True,
+            label_text, sz=10, color=pal["highlight"], bold=True,
             font=FONT_BODY, anchor=MSO_ANCHOR.TOP)
 
         # Body in INK_GRAY Verdana 11pt.
@@ -4505,10 +4599,10 @@ def build_before_after(prs, meta, action_title=None, before=None, after=None, ta
     # --- AFTER card (highlighted) ---
     acard = rounded(slide, after_x, zone_top, after_w, card_h, fill=PANEL_LIGHT)
     _apply_border(acard, LIGHT_GRAY, Pt(0.5))
-    rounded(slide, after_x, zone_top, after_w, Inches(0.06), fill=MERCK_GOLD, adj=50000)
+    rounded(slide, after_x, zone_top, after_w, Inches(0.06), fill=pal["highlight"], adj=50000)
     txt(slide, after_x + pad, zone_top + Inches(0.22),
         after_w - pad * 2, Inches(0.26),
-        _track_letters(after_label), sz=10, color=MERCK_GOLD, bold=True,
+        _track_letters(after_label), sz=10, color=pal["highlight"], bold=True,
         font=FONT_BODY)
     atitle = (after or {}).get("title", "")
     txt(slide, after_x + pad, zone_top + Inches(0.60),
@@ -4520,9 +4614,9 @@ def build_before_after(prs, meta, action_title=None, before=None, after=None, ta
                        after_w - pad * 2, card_h - Inches(1.85),
                        aitems, palette=style,
                        text_color=INK_DARK, sz=12,
-                       bullet_color=MERCK_GOLD)
+                       bullet_color=pal["highlight"])
 
-    # --- Gold right-arrow shape between the cards ---
+    # --- Theme-accent right-arrow shape between the cards ---
     ar_w = Inches(0.65)
     ar_h = Inches(0.85)
     ar_x = (before_x + before_w + after_x) / 2 - ar_w / 2
@@ -4530,7 +4624,7 @@ def build_before_after(prs, meta, action_title=None, before=None, after=None, ta
     arrow = slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW,
                                    ar_x, ar_y, ar_w, ar_h)
     arrow.shadow.inherit = False
-    _apply_fill(arrow, MERCK_GOLD)
+    _apply_fill(arrow, pal["highlight"])
     _apply_border(arrow, None)
 
     return slide
@@ -4627,12 +4721,12 @@ def build_milestone_timeline(prs, meta, action_title=None, milestones=None, take
         # Date label.
         txt(slide, zone_x + col_w * i, date_y, col_w, Inches(0.26),
             _track_letters(str(m.get("date", "")).upper()),
-            sz=10, color=MERCK_GOLD, bold=True, font=FONT_BODY,
+            sz=10, color=pal["highlight"], bold=True, font=FONT_BODY,
             align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
 
         # Title — use white on dark-background styles so text is readable.
         dark = _is_dark(style)
-        title_color = MERCK_GOLD if st == "current" else (WHITE if dark else MERCK_PURPLE)
+        title_color = pal["highlight"] if st == "current" else (WHITE if dark else MERCK_PURPLE)
         txt(slide, zone_x + col_w * i, title_y, col_w, Inches(0.40),
             str(m.get("title", "")), sz=13, color=title_color, bold=True,
             font=FONT_BODY, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
@@ -4644,7 +4738,7 @@ def build_milestone_timeline(prs, meta, action_title=None, milestones=None, take
             circle(slide, circle_x, circle_y, circle_d, fill=MERCK_PURPLE)
             _draw_check_mark(slide, circle_x, circle_y, circle_d, WHITE)
         elif st == "current":
-            circle(slide, circle_x, circle_y, circle_d, fill=MERCK_GOLD)
+            circle(slide, circle_x, circle_y, circle_d, fill=pal["highlight"])
         else:
             outer = circle(slide, circle_x, circle_y, circle_d, fill=pal["bg"])
             _apply_border(outer, LIGHT_GRAY, Pt(1.25))
@@ -4840,7 +4934,7 @@ def build_hub_spoke(prs, meta, action_title=None, hub=None, spokes=None, takeawa
     hub_x = Inches(13.333) / 2 - hub_w / 2
     hub_y = Inches(4.55) - hub_h / 2
     hub_shape = oval(slide, hub_x, hub_y, hub_w, hub_h, fill=MERCK_PURPLE)
-    _apply_border(hub_shape, MERCK_GOLD, Pt(2.25))
+    _apply_border(hub_shape, pal["highlight"], Pt(2.25))
 
     # Hub contents.
     hub_label = (hub or {}).get("label", "")
@@ -4849,7 +4943,7 @@ def build_hub_spoke(prs, meta, action_title=None, hub=None, spokes=None, takeawa
     if hub_label:
         txt(slide, hub_x, hub_y + Inches(0.35), hub_w, Inches(0.30),
             _track_letters(str(hub_label).upper()),
-            sz=10, color=MERCK_GOLD, bold=True, font=FONT_BODY,
+            sz=10, color=pal["highlight"], bold=True, font=FONT_BODY,
             align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
     if hub_title:
         txt(slide, hub_x, hub_y + Inches(0.70), hub_w, Inches(0.55),
@@ -4879,8 +4973,8 @@ def build_hub_spoke(prs, meta, action_title=None, hub=None, spokes=None, takeawa
         cx, cy = positions[i]
         card = rounded(slide, cx, cy, card_w, card_h, fill=pal["panel"])
         _apply_border(card, LIGHT_GRAY, Pt(0.5))
-        # Gold top stripe.
-        rounded(slide, cx, cy, card_w, Inches(0.06), fill=MERCK_GOLD, adj=50000)
+        # Theme-accent top stripe.
+        rounded(slide, cx, cy, card_w, Inches(0.06), fill=pal["highlight"], adj=50000)
         # Title + body.
         pad = Inches(0.22)
         txt(slide, cx + pad, cy + Inches(0.20),
@@ -4947,7 +5041,7 @@ def build_pillar_detail(prs, meta, action_title=None, pillar_number=None, pillar
     txt(slide, panel_x + Inches(0.30), panel_y + Inches(0.25),
         panel_w - Inches(0.40), Inches(0.30),
         _track_letters(str(pillar_label or "PILLAR").upper()),
-        sz=11, color=MERCK_GOLD, bold=True, font=FONT_BODY)
+        sz=11, color=pal["highlight"], bold=True, font=FONT_BODY)
 
     # Huge number (Merck Web — hero moment).
     txt(slide, panel_x, panel_y + Inches(0.65),
@@ -4963,7 +5057,7 @@ def build_pillar_detail(prs, meta, action_title=None, pillar_number=None, pillar
         txt(slide, panel_x + Inches(0.30), owner_y,
             panel_w - Inches(0.40), Inches(0.30),
             _track_letters(str(owner_label).upper()),
-            sz=10, color=MERCK_GOLD, bold=True, font=FONT_BODY)
+            sz=10, color=pal["highlight"], bold=True, font=FONT_BODY)
         txt(slide, panel_x + Inches(0.30), owner_y + Inches(0.30),
             panel_w - Inches(0.40), Inches(0.55),
             str(owner_name), sz=13, color=WHITE, bold=True,
@@ -4981,11 +5075,11 @@ def build_pillar_detail(prs, meta, action_title=None, pillar_number=None, pillar
         for i, s in enumerate(sec):
             by = right_y + (block_h + block_gap) * i
             stripe_w = Inches(0.05)
-            rect(slide, right_x, by, stripe_w, block_h, fill=MERCK_GOLD)
+            rect(slide, right_x, by, stripe_w, block_h, fill=pal["highlight"])
             txt(slide, right_x + stripe_w + Inches(0.18), by,
                 right_w - stripe_w - Inches(0.20), Inches(0.28),
                 _track_letters(str(s.get("label", "")).upper()),
-                sz=10, color=MERCK_GOLD, bold=True, font=FONT_BODY)
+                sz=10, color=pal["highlight"], bold=True, font=FONT_BODY)
             txt(slide, right_x + stripe_w + Inches(0.18),
                 by + Inches(0.32),
                 right_w - stripe_w - Inches(0.20),
@@ -5395,7 +5489,7 @@ def build_topic_set(prs, meta, action_title, topics, takeaway="", source=None,
                 label_h = Inches(0.22)
                 txt(slide, card_x, cursor_y, card_w, label_h,
                     label_text,
-                    sz=9, color=MERCK_GOLD, bold=False,
+                    sz=9, color=pal["highlight"], bold=False,
                     align=PP_ALIGN.CENTER, font=FONT_BODY,
                     anchor=MSO_ANCHOR.TOP)
                 cursor_y += label_h + Inches(0.04)
@@ -5499,7 +5593,7 @@ def build_arrow_chain(prs, meta, action_title, steps, consequence=None,
 
         # Box fill and text colors
         box_fill = MERCK_PURPLE if highlighted else PANEL_LIGHT
-        label_color = WHITE if highlighted else MERCK_GOLD
+        label_color = WHITE if highlighted else pal["highlight"]
         body_color = WHITE if highlighted else INK_DARK
 
         # Draw box
@@ -5553,7 +5647,7 @@ def build_arrow_chain(prs, meta, action_title, steps, consequence=None,
         con_body = str(consequence.get("body", ""))
 
         rounded(slide, cursor_x, zone_y, consequence_box_w, box_h,
-             fill=MERCK_YELLOW)
+             fill=pal["hot"])
 
         label_pad_x = Inches(0.12)
         label_pad_y = Inches(0.14)
@@ -5618,7 +5712,7 @@ def build_pull_quote(prs, meta, quote=None, attribution=None,
     q_top = Inches(2.10) if not subtitle else Inches(2.50)
 
     txt(slide, Inches(0.55), q_top, Inches(1.20), Inches(1.40),
-        "\u201c", sz=96, color=MERCK_GOLD, bold=True,
+        "\u201c", sz=96, color=pal["highlight"], bold=True,
         font=FONT_HEAD, align=PP_ALIGN.LEFT)
 
     if context:
@@ -5632,7 +5726,7 @@ def build_pull_quote(prs, meta, quote=None, attribution=None,
 
     attr_y = q_top + Inches(3.55)
     hairline(slide, Inches(1.40), attr_y, Inches(2.80),
-             Emu(int(Pt(2))), MERCK_GOLD)
+             Emu(int(Pt(2))), pal["highlight"])
 
     if attribution:
         txt(slide, Inches(1.40), attr_y + Inches(0.14), Inches(10.5), Inches(0.42),
@@ -5860,7 +5954,7 @@ def build_kpi_dashboard(prs, meta, action_title=None, kpis=None,
                 rect(slide,
                      sp_x + j * (bar_w + Inches(0.02)), sp_y + sp_h - bh,
                      bar_w, bh,
-                     fill=MERCK_GOLD if j == len(sp) - 1 else PURPLE_MUTED)
+                     fill=pal["highlight"] if j == len(sp) - 1 else PURPLE_MUTED)
 
     return slide
 
@@ -5912,7 +6006,7 @@ def build_icon_grid(prs, meta, action_title=None, items=None,
         cy  = zone_y + row * (card_h + gap)
         highlighted = bool(item.get("highlighted"))
         card_fill   = MERCK_PURPLE if highlighted else PANEL_LIGHT
-        icon_bg     = MERCK_GOLD   if highlighted else MERCK_PURPLE
+        icon_bg     = pal["highlight"] if highlighted else MERCK_PURPLE
         title_col   = WHITE        if highlighted else MERCK_PURPLE
         body_col    = PANEL_LIGHT  if highlighted else INK_DARK
 
@@ -5999,7 +6093,7 @@ def build_funnel(prs, meta, action_title=None, inputs=None,
         line(slide, zone_x + in_w, iy_c, out_x, out_cy,
              color=LIGHT_GRAY, weight=Pt(1.5))
 
-    rounded(slide, out_x, out_y, out_w, Inches(1.80), fill=MERCK_GOLD)
+    rounded(slide, out_x, out_y, out_w, Inches(1.80), fill=pal["highlight"])
     txt(slide, out_x + Inches(0.16), out_y + Inches(0.12),
         out_w - Inches(0.32), Inches(0.28),
         str(out.get("label", "")).upper(),

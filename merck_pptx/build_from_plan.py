@@ -168,12 +168,19 @@ _THEME_SCHEME_OVERRIDES = {
     "functional":("503291", "2DBECD",  "2DBECD",  "A5CD50"),
     "organic":   ("503291", "E61E50",  "E61E50",  "FFDCB9"),
     "synthetic": ("FFC832", "503291",  "FFC832",  "B4DC96"),
-    "technical": ("2DBECD", "503291",  "503291",  "FFDCB9"),
+    # technical: light-theme (cream bg) — dk2/accent5 must be teal so the
+    # background rectangle shows through the freeform gap in teal, not violet.
+    "technical": ("2DBECD", "2DBECD",  "2DBECD",  "FFDCB9"),
     "electronics":("FFC832","503291",  "FFC832",  "B4DC96"),
 }
 
-# The hardcoded pale-green hex in the template's layout shapes.
-_TEMPLATE_HARDCODED_BG = "B4DC96"
+# Hardcoded background hex values found in the EU and USA template layout shapes.
+# The EU template uses pale-green (#B4DC96) for the "light panel" freeform; the
+# USA template uses lime-green (#A5CD50) for the equivalent shape.  Both must be
+# patched so organic/technical (cream) and synthetic/electronics (transparent)
+# themes render correctly across both regional templates.
+_TEMPLATE_HARDCODED_BG   = "B4DC96"   # EU template light-panel colour
+_TEMPLATE_HARDCODED_BG_2 = "A5CD50"   # USA template light-panel colour
 
 # Background replacement color per theme (replaces the hardcoded pale-green
 # freeform that forms the "light panel" on covers and dividers).
@@ -278,37 +285,47 @@ def _apply_color_theme(prs, color_theme: str) -> None:
     if bg_hex is not None and bg_hex.upper() == _TEMPLATE_HARDCODED_BG.upper():
         return   # no change needed for plastic (default)
 
+    # Hex values that are "baseline background" colours baked into template shapes.
+    # B4DC96 = EU template pale-green panel; A5CD50 = USA template lime-green panel.
+    _BG_TARGETS = {_TEMPLATE_HARDCODED_BG.upper(), "A5CD50"}
+    # For plastic/functional the lime-green IS the intended background — skip it.
+    if bg_hex is not None and bg_hex.upper() == "A5CD50":
+        _BG_TARGETS.discard("A5CD50")
+
+    def _replace_bg_srgb(srgb):
+        """Replace or noFill one srgbClr element; returns True if acted on."""
+        solidFill = srgb.getparent()
+        if solidFill is None:
+            return False
+        parent = solidFill.getparent()
+        if parent is None:
+            return False
+        # Context guard: only patch shape/group fills, not text-run colours.
+        _ptag = parent.tag.split("}")[1] if "}" in parent.tag else parent.tag
+        if _ptag in ("rPr", "pPr", "defRPr", "endParaRPr", "lstStyle"):
+            return False
+        if bg_hex is not None:
+            srgb.set("val", bg_hex.upper())
+        elif _HAS_LXML:
+            # Replace <a:solidFill><a:srgbClr.../></a:solidFill> with <a:noFill/>
+            # so the freeform becomes transparent and dark-theme blobs show through.
+            idx = list(parent).index(solidFill)
+            parent.remove(solidFill)
+            noFill = _ET.Element(f"{{{_NS}}}noFill")
+            parent.insert(idx, noFill)
+        else:
+            # Without lxml, paint with dark-theme violet as closest approximation.
+            srgb.set("val", "503291")
+        return True
+
     try:
         elements_to_patch = list(master.element.iter(f"{{{_NS}}}srgbClr"))
         for layout in master.slide_layouts:
             elements_to_patch.extend(layout.element.iter(f"{{{_NS}}}srgbClr"))
 
         for srgb in elements_to_patch:
-            if srgb.get("val", "").upper() != _TEMPLATE_HARDCODED_BG.upper():
-                continue
-            if bg_hex is not None:
-                # Simple hex replacement.
-                srgb.set("val", bg_hex.upper())
-            elif _HAS_LXML:
-                # Make the enclosing solidFill a noFill so the freeform
-                # becomes transparent and the blob shapes below show through.
-                # getparent() is lxml-only; stdlib ET falls back below.
-                solidFill = srgb.getparent()
-                if solidFill is None:
-                    continue
-                parent = solidFill.getparent()
-                if parent is None:
-                    continue
-                # Replace <a:solidFill><a:srgbClr.../></a:solidFill>
-                # with    <a:noFill/>
-                idx = list(parent).index(solidFill)
-                parent.remove(solidFill)
-                noFill = _ET.Element(f"{{{_NS}}}noFill")
-                parent.insert(idx, noFill)
-            else:
-                # Without lxml, hide the pale-green panel by painting it
-                # the dark-theme base violet — closest visible approximation.
-                srgb.set("val", "503291")
+            if srgb.get("val", "").upper() in _BG_TARGETS:
+                _replace_bg_srgb(srgb)
     except Exception as exc:
         print(f"WARNING: could not replace hardcoded bg color: {exc}",
               file=sys.stderr)
@@ -470,18 +487,27 @@ _VALID_COLOR_THEMES = frozenset({
 
 
 def _resolve_style(slide: dict, meta: dict) -> str:
+    deck_style  = meta.get("deck_style")
+    color_theme = str(meta.get("color_theme") or "").lower().strip()
+
+    # merck_storytelling decks are visually coherent ONLY when every slide
+    # uses the same dark palette.  Ignore per-slide style overrides and
+    # auto-promote entirely so that Risk/Recommendation/Decision slides don't
+    # revert to white inside an otherwise dark purple deck.
+    if deck_style == "merck_storytelling":
+        return "merck_storytelling"
+
     style = slide.get("style", "inherit")
     if style == "inherit" or not style:
         # Use deck_style if set; otherwise fall back to color_theme so the
         # 6 theme palettes are automatically applied without setting deck_style.
-        deck_style   = meta.get("deck_style")
-        color_theme  = str(meta.get("color_theme") or "").lower().strip()
         if deck_style:
             style = deck_style
         elif color_theme in _VALID_COLOR_THEMES:
             style = color_theme
         else:
             style = "merck_executive"
+
     # Auto-promote: category is the canonical trigger field; page_function is
     # the fallback so plans that set only page_function still work.
     _cat = slide.get("category") or slide.get("page_function")
@@ -1423,12 +1449,17 @@ _DISPATCH = {
 # ---------------------------------------------------------------------------
 
 def _trunc(s: object, limit: int) -> object:
-    """Truncate a string to `limit` chars, appending '...' if trimmed."""
+    """Truncate a string to `limit` chars at a word boundary, appending '…'."""
     if not isinstance(s, str) or len(s) <= limit:
         return s
     if limit <= 3:
         return s[:limit]
-    return s[:limit - 3] + "..."
+    # Cut at last space to avoid mid-word truncation (looks unprofessional on slides).
+    candidate = s[:limit - 1]  # leave room for ellipsis char
+    last_space = candidate.rfind(" ")
+    if last_space > limit // 3:
+        candidate = candidate[:last_space]
+    return candidate.rstrip(",;: ") + "…"
 
 
 def _sanitize_obj(obj: object, rules: dict) -> None:
