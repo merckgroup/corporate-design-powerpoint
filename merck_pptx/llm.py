@@ -1,20 +1,49 @@
 """
 Claude API client for Merck Foundry AIP.
 
-Required environment variables:
-  AIP_BASE_URL  — Foundry AIP endpoint, e.g. https://merck.palantirfoundry.com/api/v1
-  AIP_TOKEN     — Foundry API token
+Required environment variables (checked in priority order):
+  AIP_BASE_URL        — Foundry AIP endpoint (primary)
+  ANTHROPIC_BASE_URL  — fallback if AIP_BASE_URL is not set
+
+  AIP_TOKEN           — Foundry API token (primary)
+  ANTHROPIC_AUTH_TOKEN — fallback if AIP_TOKEN is not set
 
 Optional:
   AIP_MODEL     — model ID override (default: claude-sonnet-4-6)
+
+On Windows, variables are also looked up in HKCU\\Environment via winreg
+when they are not present as process environment variables.
 """
 
 import json
 import os
+import sys
 
 import anthropic
 
 _DEFAULT_MODEL = "claude-sonnet-4-6"
+
+
+def _get_env(primary: str, fallback: str) -> str | None:
+    """Return the first non-empty value from env or Windows registry."""
+    for name in (primary, fallback):
+        val = os.environ.get(name)
+        if val:
+            return val
+    if sys.platform == "win32":
+        try:
+            import winreg
+            k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment")
+            for name in (primary, fallback):
+                try:
+                    val, _ = winreg.QueryValueEx(k, name)
+                    if val:
+                        return val
+                except FileNotFoundError:
+                    pass
+        except Exception:
+            pass
+    return None
 
 _SYSTEM_PROMPT = """\
 You are a senior management consultant who converts content into a structured \
@@ -179,18 +208,26 @@ _cached_client: "anthropic.Anthropic | None" = None
 def _get_client() -> "anthropic.Anthropic":
     global _cached_client
     if _cached_client is None:
-        base_url = os.environ.get("AIP_BASE_URL")
-        api_key = os.environ.get("AIP_TOKEN")
+        base_url = _get_env("AIP_BASE_URL", "ANTHROPIC_BASE_URL")
+        api_key  = _get_env("AIP_TOKEN",    "ANTHROPIC_AUTH_TOKEN")
         if not base_url or not api_key:
-            missing = [
-                v for v, val in [("AIP_BASE_URL", base_url), ("AIP_TOKEN", api_key)]
-                if not val
-            ]
+            missing = []
+            if not base_url:
+                missing.append("AIP_BASE_URL (or ANTHROPIC_BASE_URL)")
+            if not api_key:
+                missing.append("AIP_TOKEN (or ANTHROPIC_AUTH_TOKEN)")
             raise EnvironmentError(
                 f"Missing required environment variable(s): {', '.join(missing)}. "
                 f"Set AIP_BASE_URL and AIP_TOKEN to your Merck Foundry AIP endpoint and token."
             )
-        _cached_client = anthropic.Anthropic(base_url=base_url, api_key=api_key)
+        # Foundry's proxy authenticates via Authorization: Bearer, not x-api-key.
+        # Pass the token in both headers so the client works with Foundry's proxy
+        # and also with direct Anthropic endpoints.
+        _cached_client = anthropic.Anthropic(
+            base_url=base_url,
+            api_key=api_key,
+            default_headers={"Authorization": f"Bearer {api_key}"},
+        )
     return _cached_client
 
 
