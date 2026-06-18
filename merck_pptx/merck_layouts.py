@@ -1212,46 +1212,60 @@ def _top_chrome(slide, meta, category, palette, top_bar=False,
 
 
 def _bottom_chrome(slide, meta, category, page, total, palette):
-    """Footer band: deck label + page number.
+    """Footer: populate template master placeholders (ftr + sldNum).
 
-    When meta["light_footer"] is True, no purple band is drawn; the text sits
-    on white with INK_GRAY left content and MERCK_GOLD page number on the
-    right. Otherwise the default dark purple band is rendered.
+    No band or hardcoded colors are drawn. Text content is injected into the
+    slide's native <p:ph type="ftr"> and <p:ph type="sldNum"> placeholder
+    shapes so that font, color, and position are governed by the slide master.
     """
+    from lxml import etree
+    from xml.sax.saxutils import escape as _xml_escape
+
     meta = meta or {}
-    light_footer = bool(meta.get("light_footer"))
-
-    if not light_footer:
-        # Footer band (full width)
-        hairline(slide, Inches(0.0), FOOTER_Y, SLIDE_W, FOOTER_H, PURPLE_DEEP)
-        left_color = WHITE
-        page_color = MERCK_GOLD
-    else:
-        # No band; text on white.
-        left_color = INK_GRAY
-        page_color = MERCK_GOLD
-
     deck_label = meta.get("deck_label", "")
     cat = category or ""
-    left_parts = []
-    if deck_label:
-        left_parts.append(deck_label if light_footer else _tracked(deck_label))
-    if cat:
-        left_parts.append(cat if light_footer else _tracked(cat))
-    if left_parts:
-        sep = "  |  " if light_footer else "   •   "
-        txt(slide, Inches(0.65), FOOTER_TEXT_Y, Inches(10.0), Inches(0.20),
-            sep.join(left_parts), sz=(10 if light_footer else 9),
-            color=left_color, bold=False,
-            font=FONT_BODY, anchor=MSO_ANCHOR.TOP)
+    parts = [p for p in [deck_label, cat] if p]
+    footer_text = _xml_escape("   •   ".join(parts))
 
+    page_text = ""
     if page is not None:
-        page_text = _pad_int(page)
+        page_text = _xml_escape(_pad_int(page))
         if total:
-            page_text = f"{_pad_int(page)} / {_pad_int(total)}"
-        txt(slide, Inches(12.0), FOOTER_TEXT_Y, Inches(1.0), Inches(0.20),
-            page_text, sz=(10 if light_footer else 9), color=page_color,
-            bold=True, font=FONT_BODY, align=PP_ALIGN.RIGHT)
+            page_text = _xml_escape(f"{_pad_int(page)} / {_pad_int(total)}")
+
+    spTree = slide.shapes._spTree
+    _NS = (
+        'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" '
+        'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
+    )
+
+    if footer_text:
+        spTree.append(etree.fromstring(
+            f'<p:sp {_NS}>'
+            '<p:nvSpPr>'
+            '<p:cNvPr id="901" name="Footer"/>'
+            '<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>'
+            '<p:nvPr><p:ph type="ftr"/></p:nvPr>'
+            '</p:nvSpPr>'
+            '<p:spPr/>'
+            '<p:txBody><a:bodyPr/><a:lstStyle/>'
+            f'<a:p><a:r><a:t>{footer_text}</a:t></a:r></a:p>'
+            '</p:txBody></p:sp>'
+        ))
+
+    if page_text:
+        spTree.append(etree.fromstring(
+            f'<p:sp {_NS}>'
+            '<p:nvSpPr>'
+            '<p:cNvPr id="902" name="SlideNumber"/>'
+            '<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>'
+            '<p:nvPr><p:ph type="sldNum" sz="quarter"/></p:nvPr>'
+            '</p:nvSpPr>'
+            '<p:spPr/>'
+            '<p:txBody><a:bodyPr/><a:lstStyle/>'
+            f'<a:p><a:r><a:t>{page_text}</a:t></a:r></a:p>'
+            '</p:txBody></p:sp>'
+        ))
 
 
 _ICON_DISPATCH = {
