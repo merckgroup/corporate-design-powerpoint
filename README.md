@@ -2,7 +2,60 @@
 
 Convert an existing PowerPoint, a markdown brief, or a structured slide plan into a polished **Merck Healthcare KGaA-branded deck** without opening PowerPoint.
 
-> **Installation and setup:** see [SETUP.md](SETUP.md).
+> **Installation and setup:** see [SETUP.md](SETUP.md).  
+> **Brand & design rules:** [Merck_Presentation_Guidelines.md](Merck_Presentation_Guidelines.md) — authoritative reference for colors, fonts, shapes, and accessibility.  
+> **How to use the pipeline:** [Merck_Presentation_Helper.md](Merck_Presentation_Helper.md) — practical guide for choosing layouts, writing plans, and avoiding common mistakes.
+
+---
+
+## Design Guidelines
+
+Both documents live at the root of this repository:
+
+| Document | Purpose |
+|---|---|
+| [Merck_Presentation_Guidelines.md](Merck_Presentation_Guidelines.md) | Complete Merck Corporate Design rules: color palette, typography, visual styles, six color themes, 44 layout keys, shape rules, accessibility checklist, and pre-publish checklist. Authoritative reference for any design decision. |
+| [Merck_Presentation_Helper.md](Merck_Presentation_Helper.md) | Practical user guide: how to choose region / style / theme, section number rules, layout picker table, content schemas for the most common layouts, color do's and don'ts, and a pre-send checklist. |
+
+### Quick design reference
+
+**Three visual styles** (`meta.deck_style`)
+
+| Style | Background | Character |
+|---|---|---|
+| `merck_executive` | White | Formal — forced on Executive Summary, Recommendation, Decision Request, Risk, Tradeoff slides |
+| `merck_corporate` | White | General business presentations |
+| `merck_storytelling` | Dark purple | Impactful narrative, white text |
+
+**Six color themes** (`meta.color_theme`)
+
+| Theme | Cover BG | Accent | Best for |
+|---|---|---|---|
+| `plastic` *(default)* | Lime green `#A5CD50` | Pink `#EB3C96` | General purpose |
+| `functional` | Lime green `#A5CD50` | Teal `#2DBECD` | Life science |
+| `organic` | Cream `#FFDCB9` | Red `#E61E50` | Healthcare / patient |
+| `synthetic` | Violet `#503291` | Yellow `#FFC832` | Industrial / chemistry |
+| `technical` | Cream `#FFDCB9` | Teal `#2DBECD` | Engineering / IT |
+| `electronics` | Violet `#503291` | Yellow `#FFC832` | EMD Electronics (photo cover) |
+
+**Key color constants**
+
+| Role | Name | Hex |
+|---|---|---|
+| Primary brand / headings | MERCK_PURPLE | `#503291` |
+| Highlight / warm emphasis | MERCK_GOLD (Pink) | `#EB3C96` |
+| Primary body text | INK_DARK | `#1A1626` |
+| Secondary text / sources | INK_GRAY | `#555D6E` |
+| Good / positive | GOOD_GREEN | `#149B5F` |
+| Warning / amber | MERCK_YELLOW | `#FFC832` |
+| Bad / negative | BAD_RED | `#E61E50` |
+
+**Typography** — the pipeline applies all fonts automatically:
+- Action title: Verdana Regular 22 pt, Rich Purple
+- Slide heading: Verdana Bold 22 pt, Rich Purple
+- Body text: Verdana Regular (sized to layout density)
+- Source lines: Verdana Regular 8 pt, INK_GRAY
+- Footer: Verdana Regular 8 pt, Rich Purple
 
 ---
 

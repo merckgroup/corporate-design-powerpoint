@@ -135,7 +135,7 @@ CHART_5  = (0xF7, 0xA2, 0x16)   # #F7A216 — amber-500
 CHART_6  = (0x0E, 0x69, 0xAF)   # #0E69AF — blue-700
 CHART_7  = (0xE6, 0x1E, 0x50)   # #E61E50 — red-600 (same as BAD_RED)
 CHART_8  = (0x96, 0xD7, 0xD2)   # #96D7D2 — sensitive-blue (exact from vibrant-m)
-CHART_9  = (0x13, 0x9A, 0x5F)   # #139A5F — green-500
+CHART_9  = (0x14, 0x9B, 0x5F)   # #149B5F — green-500
 CHART_10 = (0xFF, 0xDC, 0xB9)   # #FFDCB9 — sensitive-yellow (exact from vibrant-m)
 CHART_11 = (0x9D, 0x80, 0xE6)   # #9D80E6 — violet-400
 CHART_12 = (0x8C, 0x22, 0x35)   # #8C2235 — red-800
@@ -1400,9 +1400,9 @@ def _top_chrome(slide, meta, category, palette, top_bar=False,
 def _bottom_chrome(slide, meta, category, page, total, palette):
     """Footer text boxes: deck label + category (left) and page number (right).
 
-    No band is drawn. Colors follow the template: INK_GRAY for the left text,
-    MERCK_GOLD for the page number. Custom text boxes are used (not native
-    placeholder injection) because the content is per-slide dynamic.
+    No band is drawn. Both elements use Rich Purple at 8 pt per CD guidelines.
+    Custom text boxes are used (not native placeholder injection) because the
+    content is per-slide dynamic.
     """
     meta = meta or {}
 
@@ -1411,8 +1411,8 @@ def _bottom_chrome(slide, meta, category, page, total, palette):
     left_parts = [p for p in [deck_label, cat] if p]
     if left_parts:
         txt(slide, Inches(0.65), FOOTER_TEXT_Y, Inches(10.0), Inches(0.20),
-            "   •   ".join(left_parts), sz=9,
-            color=INK_GRAY, bold=False,
+            "   •   ".join(left_parts), sz=8,
+            color=MERCK_PURPLE, bold=False,
             font=FONT_BODY, anchor=MSO_ANCHOR.TOP)
 
     if page is not None:
@@ -1420,8 +1420,8 @@ def _bottom_chrome(slide, meta, category, page, total, palette):
         if total:
             page_text = f"{_pad_int(page)} / {_pad_int(total)}"
         txt(slide, Inches(12.0), FOOTER_TEXT_Y, Inches(1.0), Inches(0.20),
-            page_text, sz=9, color=MERCK_GOLD,
-            bold=True, font=FONT_BODY, align=PP_ALIGN.RIGHT)
+            page_text, sz=8, color=MERCK_PURPLE,
+            bold=False, font=FONT_BODY, align=PP_ALIGN.RIGHT)
 
 
 _ICON_DISPATCH = {
@@ -1474,7 +1474,7 @@ def _section_marker(slide, number, category, palette, icon=None):
 
 
 def _render_action_title(slide, x, y, w, h, content, palette,
-                         size=26, italic_color=None, base_color=None):
+                         size=22, italic_color=None, base_color=None):
     """Render action title that may be a string OR list of (text, italic_bool) tuples."""
     pal = _palette_for(palette)
     dark = _is_dark(palette)
@@ -1498,11 +1498,11 @@ def _render_action_title(slide, x, y, w, h, content, palette,
        all(isinstance(seg, (list, tuple)) and len(seg) == 2 for seg in content):
         for seg_text, seg_italic in content:
             color = italic_color if seg_italic else base_color
-            _add_run(p, seg_text, sz=size, color=color, bold=True,
+            _add_run(p, seg_text, sz=size, color=color, bold=False,
                      italic=bool(seg_italic), font=(FONT_HEAD if seg_italic else FONT_BODY))
     else:
         text = "" if content is None else str(content)
-        _add_run(p, text, sz=size, color=base_color, bold=True,
+        _add_run(p, text, sz=size, color=base_color, bold=False,
                  italic=False, font=FONT_BODY)
     return box
 
@@ -1682,7 +1682,7 @@ def page_number(slide, n, total, palette):
     if total:
         page_text = f"{_pad_int(n)} / {_pad_int(total)}"
     return txt(slide, Inches(12.0), FOOTER_TEXT_Y, Inches(1.0), Inches(0.20),
-               page_text, sz=9, color=MERCK_GOLD, bold=True, font=FONT_BODY,
+               page_text, sz=8, color=MERCK_PURPLE, bold=False, font=FONT_BODY,
                align=PP_ALIGN.RIGHT)
 
 
@@ -1815,28 +1815,6 @@ def decimal_align(text_value: str):
 # Card pattern (cream PANEL_LIGHT + gold top stripe)
 # ===========================================================================
 
-def _apply_drop_shadow(shape, blur_pt=8, dist_pt=2, alpha_pct=25):
-    """Apply a subtle outer drop shadow to a shape via OOXML.
-
-    Used on Corporate-palette cards to add depth without the heavy look of
-    PowerPoint's preset shadows. Executive and Storytelling stay flat.
-    """
-    from lxml import etree
-    sppr = shape.fill._xPr  # spPr element
-    # Remove any existing effectLst.
-    for existing in sppr.findall(qn("a:effectLst")):
-        sppr.remove(existing)
-    eff = etree.SubElement(sppr, qn("a:effectLst"))
-    shdw = etree.SubElement(eff, qn("a:outerShdw"))
-    shdw.set("blurRad", str(int(blur_pt * 12700)))  # pt → EMU
-    shdw.set("dist", str(int(dist_pt * 12700)))
-    shdw.set("dir", "5400000")  # 90° (straight down)
-    shdw.set("algn", "t")
-    shdw.set("rotWithShape", "0")
-    color = etree.SubElement(shdw, qn("a:srgbClr"))
-    color.set("val", "000000")
-    alpha = etree.SubElement(color, qn("a:alpha"))
-    alpha.set("val", str(int(alpha_pct * 1000)))
 
 
 def _draw_card(slide, x, y, w, h, palette, highlighted=False,
@@ -1848,22 +1826,12 @@ def _draw_card(slide, x, y, w, h, palette, highlighted=False,
         body = rounded(slide, x, y, w, h, fill=card_fill)
         stripe = stripe_color or MERCK_YELLOW
         rounded(slide, x, y, w, Inches(0.06), fill=stripe, adj=50000)
-        if palette == "merck_corporate":
-            try:
-                _apply_drop_shadow(body)
-            except Exception:
-                pass
         return WHITE, PANEL_LIGHT, stripe
     # Default card: cream panel + gold stripe + hairline border.
     body = rounded(slide, x, y, w, h, fill=PANEL_LIGHT)
     _apply_border(body, LIGHT_GRAY, Pt(0.5))
     stripe = stripe_color or MERCK_GOLD
     rounded(slide, x, y, w, Inches(0.06), fill=stripe, adj=50000)
-    if palette == "merck_corporate":
-        try:
-            _apply_drop_shadow(body)
-        except Exception:
-            pass
     return MERCK_PURPLE, INK_GRAY, stripe
 
 
@@ -1873,13 +1841,23 @@ def _gold_square_bullet(slide, x, y, size=Inches(0.10), color=None):
 
 def _bulleted_list(slide, x, y, w, h, items, palette,
                    text_color=None, sz=11, bullet_color=None):
-    """Render a list with small filled bullet squares and tight line spacing."""
+    """Render a list with bullet hierarchy and CD-compliant paragraph spacing.
+
+    Indent detection: items starting with 2+ spaces are rendered as level-3
+    sub-bullets (en-dash, slightly smaller, indented) per CD bullet hierarchy.
+    All other items are level-2 bullets (▪).  Level-1 (plain text, no bullet)
+    is not used here — these are always body list items.
+
+    Paragraph spacing follows CD spec: 3 pt before each paragraph (except the
+    first), 3 pt after every paragraph, line spacing 1.05×.
+    """
     if not items:
         return
     pal = _palette_for(palette)
     if text_color is None:
         text_color = pal["ink"]
     bcol = bullet_color or MERCK_GOLD
+
     box = slide.shapes.add_textbox(x, y, w, h)
     tf = box.text_frame
     tf.word_wrap = True
@@ -1887,15 +1865,37 @@ def _bulleted_list(slide, x, y, w, h, items, palette,
     tf.margin_right = Inches(0.02)
     tf.margin_top = Inches(0.0)
     tf.margin_bottom = Inches(0.0)
+
     for i, it in enumerate(items):
+        raw = str(it)
+        is_sub = raw.startswith("  ")          # 2+ leading spaces → level-3
+        text   = raw.lstrip() if is_sub else raw
+
         if i == 0:
             p = tf.paragraphs[0]
         else:
             p = tf.add_paragraph()
-            p.space_before = Pt(4)
-        # Bullet glyph: a small black-square unicode char colored gold.
-        _add_run(p, "▪  ", sz=sz, color=bcol, bold=True, font=FONT_BODY)
-        _add_run(p, str(it), sz=sz, color=text_color, font=FONT_BODY)
+            p.space_before = Pt(3)             # CD: 3 pt before non-first paragraphs
+        p.space_after = Pt(3)                  # CD: 3 pt after every paragraph
+
+        # CD line spacing: 1.05× multiple via XML (no python-pptx shortcut for multiples)
+        from lxml import etree as _et
+        pPr = p._p.get_or_add_pPr()
+        for existing in pPr.findall(qn("a:lnSpc")):
+            pPr.remove(existing)
+        lnSpc = _et.SubElement(pPr, qn("a:lnSpc"))
+        spcPct = _et.SubElement(lnSpc, qn("a:spcPct"))
+        spcPct.set("val", "105000")            # 105 % = 1.05×
+
+        if is_sub:
+            # Level 3: indented en-dash bullet, slightly smaller
+            sub_sz = max(sz - 1, 9)
+            _add_run(p, "    –  ", sz=sub_sz, color=bcol, bold=False, font=FONT_BODY)
+            _add_run(p, text,     sz=sub_sz, color=text_color, font=FONT_BODY)
+        else:
+            # Level 2: filled square bullet
+            _add_run(p, "▪  ", sz=sz, color=bcol, bold=True, font=FONT_BODY)
+            _add_run(p, text, sz=sz, color=text_color, font=FONT_BODY)
 
 
 # ===========================================================================
@@ -2711,8 +2711,7 @@ def _render_chart(slide, chart, x, y, w, h, palette):
 # ===========================================================================
 
 def _style_or_promote(category, style):
-    if category and any(p.lower() in str(category).lower()
-                        for p in AUTO_PROMOTE_EXECUTIVE):
+    if category and str(category) in AUTO_PROMOTE_EXECUTIVE:
         return "merck_executive"
     return style
 
@@ -3508,14 +3507,9 @@ def _two_or_three_column_card(slide, x, y, w, h, col, palette):
     else:
         highlighted = col.get("tone") == "positive"
 
-    # Card background — always PANEL_LIGHT; drop shadow on Corporate palette.
+    # Card background — always PANEL_LIGHT.
     card = rounded(slide, x, y, w, h, fill=PANEL_LIGHT)
     _apply_border(card, LIGHT_GRAY, Pt(0.5))
-    if palette == "merck_corporate":
-        try:
-            _apply_drop_shadow(card)
-        except Exception:
-            pass
 
     # Header bar: MERCK_PURPLE (#503291) normal, LY_CYAN (#2DBECD) highlighted
     HDR_H    = Inches(0.40)
@@ -4185,8 +4179,14 @@ def build_gantt(prs, meta, action_title=None, rows=None, quarters=None, takeaway
             anchor=MSO_ANCHOR.MIDDLE)
         hairline(slide, grid_x, ry + row_h - Emu(int(Pt(0.5))),
                  grid_w, Emu(int(Pt(0.5))), LIGHT_GRAY)
-        sq = float(r.get("start_q", 1))
-        du = float(r.get("duration_q", 1))
+        try:
+            sq = float(r.get("start_q", 1))
+        except (TypeError, ValueError):
+            sq = 1.0
+        try:
+            du = float(r.get("duration_q", 1))
+        except (TypeError, ValueError):
+            du = 1.0
         bar_x = grid_x + (sq - 1) * col_w
         bar_w = du * col_w
         if bar_x < grid_x:
@@ -4760,7 +4760,8 @@ def build_status_table(prs, meta, action_title=None, columns=None, rows=None, ta
                     break
             if not val:
                 # Fallback to first-word match or exact-lowercase match.
-                first_word = str(c).strip().lower().split()[0] if c else ""
+                _parts = str(c).strip().lower().split() if c else []
+                first_word = _parts[0] if _parts else ""
                 val = row.get(first_word) or row.get(str(c).strip().lower()) or ""
             cell_w = col_widths[i]
             if i in rag_cols:
@@ -6325,7 +6326,7 @@ def build_word_cloud(prs, meta, action_title=None, words=None,
         if i >= len(GRID):
             break
         gx, gy = GRID[i]
-        weight  = max(1.0, min(5.0, float(word.get("weight", 2))))
+        weight  = max(1.0, min(5.0, float(word.get("weight") or 2)))
         sz      = int(10 + weight * 5)
         col     = word.get("color") or WORD_COLORS[i % len(WORD_COLORS)]
         txt(slide, Inches(gx), Inches(gy), Inches(2.20), Inches(0.46),
@@ -6573,8 +6574,14 @@ def build_risk_heatmap(prs, meta, action_title=None, risks=None,
 
     for i, risk in enumerate(risks):
         col = risk.get("color") or RISK_COLORS[i % len(RISK_COLORS)]
-        lk  = max(1, min(5, int(risk.get("likelihood", 3))))
-        im  = max(1, min(5, int(risk.get("impact",     3))))
+        try:
+            lk = max(1, min(5, int(float(risk.get("likelihood", 3)))))
+        except (TypeError, ValueError):
+            lk = 3
+        try:
+            im = max(1, min(5, int(float(risk.get("impact", 3)))))
+        except (TypeError, ValueError):
+            im = 3
         dx  = grid_x + (lk - 1) * cell_w + cell_w / 2
         dy  = grid_y + (GRID_N - im) * cell_h + cell_h / 2
         circle(slide, dx - dot_r, dy - dot_r, dot_r * 2, fill=col)

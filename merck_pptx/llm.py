@@ -229,25 +229,28 @@ Visual / story:
      many items with long text.
 """
 
-# Module-level cached client — constructed lazily on first generate_plan() call.
+# Module-level cached client — reconstructed whenever credentials change so
+# short-lived Foundry tokens (e.g. 1-hour TTL) are picked up on the next call.
 _cached_client: "anthropic.Anthropic | None" = None
+_cached_creds: "tuple[str | None, str | None]" = (None, None)
 
 
 def _get_client() -> "anthropic.Anthropic":
-    global _cached_client
-    if _cached_client is None:
-        base_url = _get_env("AIP_BASE_URL", "ANTHROPIC_BASE_URL")
-        api_key  = _get_env("AIP_TOKEN",    "ANTHROPIC_AUTH_TOKEN")
-        if not base_url or not api_key:
-            missing = []
-            if not base_url:
-                missing.append("AIP_BASE_URL (or ANTHROPIC_BASE_URL)")
-            if not api_key:
-                missing.append("AIP_TOKEN (or ANTHROPIC_AUTH_TOKEN)")
-            raise EnvironmentError(
-                f"Missing required environment variable(s): {', '.join(missing)}. "
-                f"Set AIP_BASE_URL and AIP_TOKEN to your Merck Foundry AIP endpoint and token."
-            )
+    global _cached_client, _cached_creds
+    base_url = _get_env("AIP_BASE_URL", "ANTHROPIC_BASE_URL")
+    api_key  = _get_env("AIP_TOKEN",    "ANTHROPIC_AUTH_TOKEN")
+    if not base_url or not api_key:
+        missing = []
+        if not base_url:
+            missing.append("AIP_BASE_URL (or ANTHROPIC_BASE_URL)")
+        if not api_key:
+            missing.append("AIP_TOKEN (or ANTHROPIC_AUTH_TOKEN)")
+        raise EnvironmentError(
+            f"Missing required environment variable(s): {', '.join(missing)}. "
+            f"Set AIP_BASE_URL and AIP_TOKEN to your Merck Foundry AIP endpoint and token."
+        )
+    if _cached_client is None or _cached_creds != (base_url, api_key):
+        _cached_creds = (base_url, api_key)
         # Foundry's proxy authenticates via Authorization: Bearer, not x-api-key.
         # Pass the token in both headers so the client works with Foundry's proxy
         # and also with direct Anthropic endpoints.
@@ -283,7 +286,7 @@ def generate_plan(raw_content: str, meta: dict) -> dict:
         If Claude's response is not parseable JSON.
     """
     # AIP_MODEL resolved via registry-aware _get_env, consistent with AIP_BASE_URL / AIP_TOKEN.
-    model = _get_env("AIP_MODEL", "AIP_MODEL") or _DEFAULT_MODEL
+    model = _get_env("AIP_MODEL", "ANTHROPIC_MODEL") or _DEFAULT_MODEL
     client = _get_client()
 
     # Source content is wrapped in XML tags to create a clear boundary between
@@ -302,6 +305,7 @@ def generate_plan(raw_content: str, meta: dict) -> dict:
 
     last_exc: Exception
     raw_json: str = ""
+    messages = [{"role": "user", "content": user_message}]
     for attempt in range(1, 4):
         with client.messages.stream(
             model=model,
@@ -311,7 +315,7 @@ def generate_plan(raw_content: str, meta: dict) -> dict:
                 "text": _SYSTEM_PROMPT,
                 "cache_control": {"type": "ephemeral"},
             }],
-            messages=[{"role": "user", "content": user_message}],
+            messages=messages,
         ) as stream:
             final = stream.get_final_message()
 
@@ -322,14 +326,14 @@ def generate_plan(raw_content: str, meta: dict) -> dict:
         raw_json = final.content[0].text.strip()
 
         # Strip only the outer markdown code fence if the model added one.
-        # We cannot strip all lines starting with ``` because JSON string values
-        # may legitimately contain code fences (e.g. in notes fields).
+        # Match only lines whose full content is exactly "```" (the closing
+        # fence) to avoid truncating JSON string values that contain lines
+        # like "```python" (language-tagged inner fences in notes fields).
         if raw_json.startswith("```"):
             lines = raw_json.splitlines()
-            # Find the closing fence line (last line starting with ```)
             end = len(lines)
             for i in range(len(lines) - 1, 0, -1):
-                if lines[i].startswith("```"):
+                if lines[i].strip() == "```":
                     end = i
                     break
             raw_json = "\n".join(lines[1:end]).strip()
@@ -343,6 +347,14 @@ def generate_plan(raw_content: str, meta: dict) -> dict:
                     f"WARNING: JSON parse error on attempt {attempt}, retrying... ({exc})",
                     file=sys.stderr,
                 )
+                # Build a corrective turn so the model knows its output was invalid.
+                messages = messages + [
+                    {"role": "assistant", "content": raw_json},
+                    {"role": "user", "content":
+                        "Your previous response was not valid JSON. "
+                        "Return ONLY the raw JSON object — no markdown fences, "
+                        "no prose, no explanation."},
+                ]
 
     # All attempts failed — raise with limited preview to avoid log pollution.
     preview = raw_json[:120].encode("unicode_escape").decode()

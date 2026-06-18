@@ -21,8 +21,9 @@ env/
 # Original download files (already copied into merck_pptx/)
 /Templates/
 
-# Test / scratch files
+# Test / scratch files and generated output
 Test/
+output/
 
 # Claude Code session data
 .claude/

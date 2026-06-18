@@ -23,8 +23,10 @@ from typing import Optional
 
 try:
     from lxml import etree as _ET
+    _HAS_LXML = True
 except ImportError:
     import xml.etree.ElementTree as _ET
+    _HAS_LXML = False
 
 from merck_pptx.merck_layouts import (
     open_deck, save_deck, AUTO_PROMOTE_EXECUTIVE,
@@ -258,9 +260,11 @@ def _apply_color_theme(prs, color_theme: str) -> None:
                 _set_scheme_color(clr_scheme, "accent5", a5)
                 _set_scheme_color(clr_scheme, "lt2",     lt2)
                 # Write the modified XML back as bytes.
+                # standalone=True is lxml-only; stdlib ET ignores the kwarg.
+                _ts_kw = {"standalone": True} if _HAS_LXML else {}
                 theme_part.blob = _ET.tostring(
                     theme_elem, xml_declaration=True,
-                    encoding="UTF-8", standalone=True,
+                    encoding="UTF-8", **_ts_kw,
                 )
     except Exception as exc:
         print(f"WARNING: could not apply theme color scheme: {exc}",
@@ -285,9 +289,10 @@ def _apply_color_theme(prs, color_theme: str) -> None:
             if bg_hex is not None:
                 # Simple hex replacement.
                 srgb.set("val", bg_hex.upper())
-            else:
+            elif _HAS_LXML:
                 # Make the enclosing solidFill a noFill so the freeform
                 # becomes transparent and the blob shapes below show through.
+                # getparent() is lxml-only; stdlib ET falls back below.
                 solidFill = srgb.getparent()
                 if solidFill is None:
                     continue
@@ -300,6 +305,10 @@ def _apply_color_theme(prs, color_theme: str) -> None:
                 parent.remove(solidFill)
                 noFill = _ET.Element(f"{{{_NS}}}noFill")
                 parent.insert(idx, noFill)
+            else:
+                # Without lxml, hide the pale-green panel by painting it
+                # the dark-theme base violet — closest visible approximation.
+                srgb.set("val", "503291")
     except Exception as exc:
         print(f"WARNING: could not replace hardcoded bg color: {exc}",
               file=sys.stderr)
@@ -357,7 +366,9 @@ def _place_image(slide, img_spec: dict) -> None:
         )
         return
     _allowed_image_root = pathlib.Path.cwd().resolve()
-    if not str(img_path).startswith(str(_allowed_image_root)):
+    try:
+        img_path.relative_to(_allowed_image_root)
+    except ValueError:
         print(
             f"WARNING: image not placed — '{img_path}' is outside the allowed "
             f"directory ({_allowed_image_root}). Move the image file inside the "
@@ -406,7 +417,11 @@ def _wire_agenda_hyperlinks(prs, ordered_slides: list) -> None:
             if not name.startswith("AgendaChapter_"):
                 continue
             key = name.split("_", 1)[1]
-            target_idx = sn_to_idx.get(key) or sn_to_idx.get(key.lstrip("0"))
+            target_idx = sn_to_idx.get(key)
+        if target_idx is None:
+            stripped = key.lstrip("0")
+            if stripped:
+                target_idx = sn_to_idx.get(stripped)
             if target_idx is None:
                 continue
             try:
@@ -467,7 +482,10 @@ def _resolve_style(slide: dict, meta: dict) -> str:
             style = color_theme
         else:
             style = "merck_executive"
-    if slide.get("page_function") in AUTO_PROMOTE_EXECUTIVE:
+    # Auto-promote: category is the canonical trigger field; page_function is
+    # the fallback so plans that set only page_function still work.
+    _cat = slide.get("category") or slide.get("page_function")
+    if _cat in AUTO_PROMOTE_EXECUTIVE:
         style = "merck_executive"
     return style
 
@@ -710,20 +728,14 @@ def _normalise_decision(d: dict) -> dict:
     Plan schema:  {tone, number, owner, text}
     Layout reads: {tone, number, owner, title (opt), desc/body/description}
 
-    When only "text" is present (single-string body, no title/desc split),
-    map it to "body" so the layout renders it in the body area.  Explicit
-    "title" or "desc"/"body"/"description" keys are left untouched so plans
-    that already use the internal naming continue to work.
+    Maps "text" → "body" whenever body/desc/description are absent, regardless
+    of whether "title" is present.  Explicit body/desc/description keys are left
+    untouched so plans already using internal naming continue to work.
     """
     d = dict(d)
-    has_title = bool(d.get("title") or d.get("decision"))
-    has_body  = bool(d.get("desc") or d.get("body") or d.get("description"))
-    if not has_title and not has_body:
-        raw = d.pop("text", None)
-        if raw is not None:
-            d["body"] = raw
-    elif not has_body and not has_title:
-        pass  # nothing to map
+    has_body = bool(d.get("desc") or d.get("body") or d.get("description"))
+    if not has_body and d.get("text") is not None:
+        d["body"] = d.pop("text")
     return d
 
 
@@ -1338,6 +1350,12 @@ def _build_columns_auto(prs, meta, slide, total):
     c = _content(slide)
     cols = c.get("columns", [])
     n = len(cols)
+    if n == 0:
+        print(
+            f"WARNING: 'columns' layout on page {slide.get('page', '?')} has no "
+            f"column data — slide will render blank.",
+            file=sys.stderr,
+        )
     layout = "three_column" if n == 3 else ("two_column" if n <= 2 else "four_column")
     dispatch = {
         "two_column":   _build_two_column,
@@ -1447,11 +1465,7 @@ def _sanitize_content(content: object) -> None:
             for item in val:
                 if isinstance(item, dict):
                     _sanitize_obj(item, _CONTENT_FIELD_LIMITS)
-                    for nested_val in item.values():
-                        if isinstance(nested_val, list):
-                            for nested_item in nested_val:
-                                if isinstance(nested_item, dict):
-                                    _sanitize_obj(nested_item, _CONTENT_FIELD_LIMITS)
+                    _sanitize_content(item)  # recurse into nested dicts/lists
         elif isinstance(val, dict):
             _sanitize_content(val)
 
@@ -1557,7 +1571,9 @@ def build_from_plan(plan, output_path, base_pptx: Optional[str] = None,
         bp = pathlib.Path(base_pptx).resolve()
         if not bp.is_file() or bp.suffix.lower() != ".pptx":
             raise ValueError(f"base_pptx must be an existing .pptx file: {bp}")
-        if not str(bp).startswith(str(_TEMPLATE_DIR.resolve())):
+        try:
+            bp.relative_to(_TEMPLATE_DIR.resolve())
+        except ValueError:
             raise ValueError(
                 f"base_pptx must be inside the package templates directory "
                 f"({_TEMPLATE_DIR}). Got: {bp}"

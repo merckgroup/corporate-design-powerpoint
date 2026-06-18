@@ -39,7 +39,7 @@ _VALID_LAYOUTS = frozenset({
     "vertical_numbered", "label_rows",
     # Chart / data layouts  (canonical names match merck_layouts.py)
     "chart_slide", "waterfall_slide", "2x2_matrix",
-    "stat_strip", "donut_chart", "radar_chart", "risk_heatmap",
+    "donut_chart", "radar_chart", "risk_heatmap",
     # Process / timeline
     "phase_process", "gantt", "milestone_timeline",
     "circular_flow", "arrow_chain", "funnel", "journey_map",
@@ -66,6 +66,10 @@ _VALID_COLOR_THEMES       = frozenset({
 })
 _VALID_DIVISIONS          = frozenset({
     "merck", "emd_serono", "emd_electronics", "millipore_sigma", "merck_asia",
+})
+_VALID_REGIONS            = frozenset({"eu", "usa"})
+_VALID_DECK_STYLES        = frozenset({
+    "merck_executive", "merck_corporate", "merck_storytelling",
 })
 
 MAX_SLIDES = 150
@@ -99,6 +103,28 @@ def validate_plan(plan: dict) -> list:
             f"Unknown classification '{meta.get('classification')}'. "
             f"Must be Public, Internal, or Confidential."
         )
+
+    # Hard: region must be EU or USA (legal compliance — wrong template = wrong disclaimer).
+    region_raw = meta.get("region")
+    if region_raw is not None:
+        region_norm = str(region_raw).strip().lower()
+        # Accept common aliases that build_from_plan normalises anyway.
+        if region_norm in ("us", "canada", "north america"):
+            region_norm = "usa"
+        if region_norm not in _VALID_REGIONS:
+            raise ValidationError(
+                f"meta.region '{region_raw}' is not valid. Must be 'EU' or 'USA'. "
+                f"Region controls which legal template is loaded — set this correctly."
+            )
+
+    # Hard: deck_style must be one of the three CD-defined styles.
+    deck_style = meta.get("deck_style")
+    if deck_style is not None:
+        if str(deck_style).strip().lower() not in _VALID_DECK_STYLES:
+            raise ValidationError(
+                f"meta.deck_style '{deck_style}' is not valid. "
+                f"Must be one of: {sorted(_VALID_DECK_STYLES)}."
+            )
 
     # Soft: unknown color_theme — warn but don't block.
     color_theme = str(meta.get("color_theme") or "").strip().lower()
@@ -173,6 +199,7 @@ def validate_plan(plan: dict) -> list:
                     f"Cover title too long ({len(title_text)} chars, max 60): {title_text!r}"
                 )
             has_sub = (";" in plain and plain.split(";", 1)[1].strip()) or \
+                      s.get("subtitle") or \
                       (s.get("content") or {}).get("subtitle")
             if not has_sub:
                 raise ValidationError("Cover slide is missing a subtitle.")
@@ -222,5 +249,18 @@ def validate_plan(plan: dict) -> list:
             f"Agenda has {agenda_chapters} chapters but there are "
             f"{section_divider_count} section divider slides."
         )
+
+    # Hard: section_numbers must be a gapless sequence 1..N.
+    # Non-sequential numbers break the agenda hyperlinks and the visible circle numbering.
+    if seen_nums:
+        sorted_nums = sorted(seen_nums)
+        expected    = list(range(sorted_nums[0], sorted_nums[0] + len(sorted_nums)))
+        if sorted_nums != expected:
+            missing = sorted(set(expected) - seen_nums)
+            raise ValidationError(
+                f"section_number values are not sequential. "
+                f"Found: {sorted_nums}. "
+                f"Missing or out-of-order: {missing}."
+            )
 
     return warnings
