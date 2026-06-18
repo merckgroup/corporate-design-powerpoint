@@ -64,6 +64,9 @@ _VALID_CLASSIFICATIONS    = frozenset({"public", "internal", "confidential"})
 _VALID_COLOR_THEMES       = frozenset({
     "functional", "organic", "plastic", "synthetic", "technical", "electronics",
 })
+_VALID_DIVISIONS          = frozenset({
+    "merck", "emd_serono", "emd_electronics", "millipore_sigma", "merck_asia",
+})
 
 MAX_SLIDES = 150
 
@@ -104,6 +107,15 @@ def validate_plan(plan: dict) -> list:
             f"Unknown color_theme '{meta.get('color_theme')}'. "
             f"Valid values: {sorted(_VALID_COLOR_THEMES)}. "
             f"Defaulting to 'plastic'."
+        )
+
+    # Soft: unknown division — warn but don't block.
+    division = str(meta.get("division") or "").strip().lower()
+    if division and division not in _VALID_DIVISIONS:
+        warnings.append(
+            f"Unknown division '{meta.get('division')}'. "
+            f"Valid values: {sorted(_VALID_DIVISIONS)}. "
+            f"Defaulting to 'merck'."
         )
 
     # Hard: slide count cap — prevents memory exhaustion from crafted plans.

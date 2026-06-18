@@ -21,6 +21,11 @@ import pathlib
 import sys
 from typing import Optional
 
+try:
+    from lxml import etree as _ET
+except ImportError:
+    import xml.etree.ElementTree as _ET
+
 from merck_pptx.merck_layouts import (
     open_deck, save_deck, AUTO_PROMOTE_EXECUTIVE,
     add_speaker_notes, add_slide_jump_hyperlink, add_image,
@@ -45,37 +50,36 @@ from merck_pptx.validate_plan import validate_plan, ValidationError
 _PKG_DIR = pathlib.Path(__file__).parent
 _TEMPLATE_DIR = _PKG_DIR / "templates"
 
-# Region-only defaults (backward compatibility / fallback).
-_TEMPLATES_BY_REGION = {
-    "eu":     _TEMPLATE_DIR / "EU_Merck_Themed.pptx",
-    "usa":    _TEMPLATE_DIR / "USA_Merck_Themed_Base_v1.pptx",
-    "us":     _TEMPLATE_DIR / "USA_Merck_Themed_Base_v1.pptx",
-    "canada": _TEMPLATE_DIR / "USA_Merck_Themed_Base_v1.pptx",
-}
-
-# Per-theme template file names.  The file must exist in _TEMPLATE_DIR.
-# Missing files silently fall back to the region default.
-# Keys: (region, color_theme) — region normalised to lowercase "eu" / "usa".
-_THEME_TEMPLATE_NAMES = {
-    # EU / global Merck brand
-    ("eu",  "plastic"):     "EU_Merck_Themed.pptx",          # current default
-    ("eu",  "functional"):  "EU_Merck_Functional.pptx",
-    ("eu",  "organic"):     "EU_Merck_Organic.pptx",
-    ("eu",  "synthetic"):   "EU_Merck_Synthetic.pptx",
-    ("eu",  "technical"):   "EU_Merck_Technical.pptx",
-    ("eu",  "electronics"): "EU_Merck_Electronics.pptx",
-    # USA / Canada — export from empower > 3 U.S. and Canada Business logos
-    ("usa", "plastic"):     "USA_Merck_Themed_Base_v1.pptx",
-    ("usa", "functional"):  "USA_Merck_Functional.pptx",
-    ("usa", "organic"):     "USA_Merck_Organic.pptx",
-    ("usa", "synthetic"):   "USA_Merck_Synthetic.pptx",
-    ("usa", "technical"):   "USA_Merck_Technical.pptx",
-    ("usa", "electronics"): "USA_Merck_Electronics.pptx",
+# ---------------------------------------------------------------------------
+# Template file selection — one base file per division (not per theme).
+# Color themes are applied programmatically via _apply_color_theme() after
+# the template is loaded, so only a small set of division template files is
+# needed regardless of how many color_theme variants exist.
+#
+# Supported division values (meta.division):
+#   merck (default) | emd_serono | emd_electronics | millipore_sigma | merck_asia
+# Supported region values (meta.region):
+#   eu (default) | usa / us / canada
+# ---------------------------------------------------------------------------
+_DIVISION_TEMPLATES = {
+    # (region, division) → filename in _TEMPLATE_DIR
+    # EU / global
+    ("eu",  "merck"):           "EU_Merck_Themed.pptx",
+    ("eu",  "emd_serono"):      "EU_EMDSerono_Themed.pptx",
+    ("eu",  "emd_electronics"): "EU_EMDElectronics_Themed.pptx",
+    ("eu",  "millipore_sigma"): "EU_MilliporeSigma_Themed.pptx",
+    ("eu",  "merck_asia"):      "EU_MerckAsia_Themed.pptx",
+    # USA / Canada
+    ("usa", "merck"):           "USA_Merck_Themed_Base_v1.pptx",
+    ("usa", "emd_serono"):      "USA_EMDSerono_Themed.pptx",
+    ("usa", "emd_electronics"): "USA_EMDElectronics_Themed.pptx",
+    ("usa", "millipore_sigma"): "USA_MilliporeSigma_Themed.pptx",
+    ("usa", "merck_asia"):      "USA_MerckAsia_Themed.pptx",
 }
 
 _TEMPLATE_DEFAULT = _TEMPLATE_DIR / "EU_Merck_Themed.pptx"
 
-# Keep the old key format for backward compatibility with any direct callers.
+# Backward-compat alias used by legacy callers.
 _TEMPLATES = {
     "eu":     _TEMPLATE_DIR / "EU_Merck_Themed.pptx",
     "usa":    _TEMPLATE_DIR / "USA_Merck_Themed_Base_v1.pptx",
@@ -84,31 +88,221 @@ _TEMPLATES = {
 }
 
 
-def _resolve_template(region: str, color_theme: str) -> pathlib.Path:
-    """Return the best-matching template file for (region, color_theme).
+def _resolve_template(region: str, color_theme: str,
+                      division: str = "merck") -> pathlib.Path:
+    """Return the best-matching base template for (region, division).
+
+    color_theme is intentionally ignored here — themes are applied
+    programmatically by _apply_color_theme() after the template is loaded,
+    so only one file per (region, division) pair is needed.
 
     Lookup order:
-    1. (region, color_theme) → named theme template (if file exists on disk)
-    2. region default         → _TEMPLATES_BY_REGION
-    3. global default         → EU_Merck_Themed.pptx
+    1. (region, division) from _DIVISION_TEMPLATES (if file exists on disk)
+    2. (region, "merck")  — region default
+    3. global default     — EU_Merck_Themed.pptx
     """
-    r = str(region or "eu").lower().strip()
-    t = str(color_theme or "plastic").lower().strip()
-    # Normalise region aliases.
+    r = str(region   or "eu").lower().strip()
+    d = str(division or "merck").lower().strip().replace("-", "_").replace(" ", "_")
     if r in ("us", "canada"):
         r = "usa"
-    # 1. Theme-specific template.
-    fname = _THEME_TEMPLATE_NAMES.get((r, t))
+
+    # 1. Division-specific template.
+    fname = _DIVISION_TEMPLATES.get((r, d))
     if fname:
         candidate = _TEMPLATE_DIR / fname
         if candidate.exists():
             return candidate
-    # 2. Region default.
-    region_default = _TEMPLATES_BY_REGION.get(r)
-    if region_default and region_default.exists():
-        return region_default
+
+    # 2. Region Merck default.
+    merck_default = _DIVISION_TEMPLATES.get((r, "merck"))
+    if merck_default:
+        candidate = _TEMPLATE_DIR / merck_default
+        if candidate.exists():
+            return candidate
+
     # 3. Global fallback.
     return _TEMPLATE_DEFAULT
+
+
+# ---------------------------------------------------------------------------
+# Programmatic color-theme application
+# ---------------------------------------------------------------------------
+
+# Merck Corporate Design exact hex values.
+_MC = {
+    "violet":     "503291",
+    "pink":       "EB3C96",
+    "red":        "E61E50",
+    "teal":       "2DBECD",
+    "lightgreen": "A5CD50",
+    "yellow":     "FFC832",
+    "cream":      "FFDCB9",
+    "palegreen":  "B4DC96",   # hardcoded in the current EU template shapes
+}
+
+# Per-theme overrides for the PowerPoint theme XML color slots.
+# Slots used by the organic blob shapes in the EU template:
+#   accent1 → main large blob (cover + divider left panel bg)
+#   dk2     → background-covering rectangle (slide bg visual layer)
+#   accent5 → accent/secondary blob (divider right panel + cover accent)
+#   lt2/bg2 → used in some divider sub-shapes
+# _BG_HEX: the hardcoded #B4DC96 pale-green that forms the "light" panel
+#           in the cover and divider — replaced with theme background color.
+_THEME_SCHEME_OVERRIDES = {
+    # Per-theme overrides for (accent1, dk2, accent5, lt2).
+    #
+    # accent1 → main organic blob group shapes (cover + divider large panel)
+    # dk2     → Rechteck 51: the full-slide background rectangle below the blobs
+    # accent5 → secondary accent blobs in the divider layout
+    # lt2     → secondary uses in divider sub-shapes
+    #
+    # For light themes (bg = lime green or cream):
+    #   dk2 = accent colour so the background rect peeks through the freeform gap
+    # For dark themes (bg = violet):
+    #   dk2 = "503291" so the background rect is violet (dark) → dark slide feel
+    #
+    #            accent1      dk2         accent5     lt2
+    "plastic":   ("503291", "EB3C96",  "EB3C96",  "B4DC96"),
+    "functional":("503291", "2DBECD",  "2DBECD",  "A5CD50"),
+    "organic":   ("503291", "E61E50",  "E61E50",  "FFDCB9"),
+    "synthetic": ("FFC832", "503291",  "FFC832",  "B4DC96"),
+    "technical": ("2DBECD", "503291",  "503291",  "FFDCB9"),
+    "electronics":("FFC832","503291",  "FFC832",  "B4DC96"),
+}
+
+# The hardcoded pale-green hex in the template's layout shapes.
+_TEMPLATE_HARDCODED_BG = "B4DC96"
+
+# Background replacement color per theme (replaces the hardcoded pale-green
+# freeform that forms the "light panel" on covers and dividers).
+# None = make the freeform transparent so dark-theme blob shapes show through.
+_THEME_BG_HEX = {
+    "plastic":    "A5CD50",   # lime green
+    "functional": "A5CD50",   # lime green
+    "organic":    "FFDCB9",   # cream / paleyellow
+    "synthetic":  None,        # transparent → yellow blobs visible on violet bg
+    "technical":  "FFDCB9",   # cream
+    "electronics":None,        # transparent → yellow blobs visible on violet bg
+}
+
+
+def _apply_color_theme(prs, color_theme: str) -> None:
+    """Apply a Merck Corporate Design color theme to the loaded presentation.
+
+    Modifies two things IN MEMORY (original file untouched):
+    1. The slide master's theme color scheme XML — so shapes using
+       scheme:accent1 / scheme:dk2 / scheme:accent5 etc. automatically
+       render in the correct theme colors.
+    2. All layout shape XML — replaces the hardcoded #B4DC96 pale-green
+       that forms the "light panel" background on covers and dividers with
+       the appropriate theme background color.
+
+    Must be called immediately after open_deck() and before any slides are
+    added.  Themes map exactly to the 6 official Merck Corporate Design
+    variants in the empower library.
+    """
+    theme_lower = str(color_theme or "plastic").lower().strip()
+    overrides = _THEME_SCHEME_OVERRIDES.get(theme_lower)
+    bg_hex    = _THEME_BG_HEX.get(theme_lower, _TEMPLATE_HARDCODED_BG)
+
+    if not overrides:
+        return   # unknown theme — leave template colors unchanged
+
+    a1, dk2, a5, lt2 = overrides
+
+    # ------------------------------------------------------------------
+    # 1. Modify the theme color scheme in the slide master's theme part.
+    # ------------------------------------------------------------------
+    _NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
+
+    def _set_scheme_color(clr_scheme, slot_tag: str, hex_val: str):
+        """Find <a:{slot_tag}> inside <a:clrScheme> and set its srgbClr."""
+        for child in clr_scheme:
+            tag = child.tag.split("}")[1] if "}" in child.tag else child.tag
+            if tag != slot_tag:
+                continue
+            srgb = child.find(f"{{{_NS}}}srgbClr")
+            if srgb is not None:
+                srgb.set("val", hex_val)
+            else:
+                # Replace any sysClr with srgbClr
+                for old in list(child):
+                    child.remove(old)
+                srgb = _ET.SubElement(child, f"{{{_NS}}}srgbClr")
+                srgb.set("val", hex_val)
+            return
+
+    master = prs.slide_masters[0]
+    try:
+        # Locate the theme part via relationship.
+        # The theme part is a raw opc.Part (bytes), not a parsed XML part,
+        # so we access it via .blob, modify, and write back.
+        THEME_RELTYPE = (
+            "http://schemas.openxmlformats.org/officeDocument/2006/"
+            "relationships/theme"
+        )
+        theme_part = None
+        for rel in master.part.rels.values():
+            if not rel.is_external and THEME_RELTYPE in str(rel.reltype):
+                theme_part = rel.target_part
+                break
+
+        if theme_part is not None:
+            # Parse the theme XML from its raw bytes.
+            theme_xml  = theme_part.blob
+            theme_elem = _ET.fromstring(theme_xml)
+            clr_scheme = theme_elem.find(f".//{{{_NS}}}clrScheme")
+            if clr_scheme is not None:
+                _set_scheme_color(clr_scheme, "accent1", a1)
+                _set_scheme_color(clr_scheme, "dk2",     dk2)
+                _set_scheme_color(clr_scheme, "accent5", a5)
+                _set_scheme_color(clr_scheme, "lt2",     lt2)
+                # Write the modified XML back as bytes.
+                theme_part.blob = _ET.tostring(
+                    theme_elem, xml_declaration=True,
+                    encoding="UTF-8", standalone=True,
+                )
+    except Exception as exc:
+        print(f"WARNING: could not apply theme color scheme: {exc}",
+              file=sys.stderr)
+
+    # ------------------------------------------------------------------
+    # 2. Replace hardcoded #B4DC96 hex in all layout shapes.
+    #    bg_hex = new color hex  → replace the fill value
+    #    bg_hex = None           → make the shape transparent (noFill)
+    # ------------------------------------------------------------------
+    if bg_hex is not None and bg_hex.upper() == _TEMPLATE_HARDCODED_BG.upper():
+        return   # no change needed for plastic (default)
+
+    try:
+        elements_to_patch = list(master.element.iter(f"{{{_NS}}}srgbClr"))
+        for layout in master.slide_layouts:
+            elements_to_patch.extend(layout.element.iter(f"{{{_NS}}}srgbClr"))
+
+        for srgb in elements_to_patch:
+            if srgb.get("val", "").upper() != _TEMPLATE_HARDCODED_BG.upper():
+                continue
+            if bg_hex is not None:
+                # Simple hex replacement.
+                srgb.set("val", bg_hex.upper())
+            else:
+                # Make the enclosing solidFill a noFill so the freeform
+                # becomes transparent and the blob shapes below show through.
+                solidFill = srgb.getparent()
+                if solidFill is None:
+                    continue
+                parent = solidFill.getparent()
+                if parent is None:
+                    continue
+                # Replace <a:solidFill><a:srgbClr.../></a:solidFill>
+                # with    <a:noFill/>
+                idx = list(parent).index(solidFill)
+                parent.remove(solidFill)
+                noFill = _ET.Element(f"{{{_NS}}}noFill")
+                parent.insert(idx, noFill)
+    except Exception as exc:
+        print(f"WARNING: could not replace hardcoded bg color: {exc}",
+              file=sys.stderr)
 
 # Permitted image file extensions — prevents a crafted plan from embedding
 # arbitrary files (e.g. databases, documents) by disguising them as images.
@@ -1353,9 +1547,10 @@ def build_from_plan(plan, output_path, base_pptx: Optional[str] = None,
         s["page"] = f"A{i}"
 
     if base_pptx is None:
-        region       = str(meta.get("region", "eu")).lower().strip()
-        color_theme  = str(meta.get("color_theme") or "plastic").lower().strip()
-        template_path = _resolve_template(region, color_theme)
+        region      = str(meta.get("region",   "eu")).lower().strip()
+        color_theme = str(meta.get("color_theme") or "plastic").lower().strip()
+        division    = str(meta.get("division")    or "merck").lower().strip()
+        template_path = _resolve_template(region, color_theme, division)
     else:
         # Security: restrict base_pptx to the package templates directory so
         # a caller cannot force-load an arbitrary or maliciously crafted .pptx.
@@ -1368,8 +1563,14 @@ def build_from_plan(plan, output_path, base_pptx: Optional[str] = None,
                 f"({_TEMPLATE_DIR}). Got: {bp}"
             )
         template_path = bp
+        color_theme = str(meta.get("color_theme") or "plastic").lower().strip()
 
     prs = open_deck(str(template_path))
+
+    # Apply color theme programmatically — modifies the master's theme XML and
+    # replaces hardcoded shape fill colors so ALL cover/divider blob shapes
+    # render in the selected theme's accent colors.  Must happen before slides.
+    _apply_color_theme(prs, color_theme)
     ordered = main_slides + appendix_slides
 
     for s in ordered:

@@ -275,7 +275,7 @@ PALETTES = {
         "accent_2":  _MC_LIGHTBLUE,
         "accent_3":  _MC_LIGHTGREEN,
         "highlight": _MC_YELLOW,
-        "hot":       _MC_LIGHTBLUE,
+        "hot":       _MC_YELLOW,      # yellow: section number + takeaway band
         "rule":      PURPLE_MUTED,
         "panel":     (0x3F, 0x28, 0x70),    # dark panel (lighter than bg)
         "muted":     PURPLE_MUTED,
@@ -311,7 +311,7 @@ PALETTES = {
         "accent_2":  _MC_LIGHTBLUE,
         "accent_3":  _MC_LIGHTGREEN,
         "highlight": _MC_YELLOW,
-        "hot":       _MC_LIGHTBLUE,
+        "hot":       _MC_YELLOW,      # yellow: section number + takeaway band
         "rule":      PURPLE_MUTED,
         "panel":     (0x3F, 0x28, 0x70),
         "muted":     PURPLE_MUTED,
@@ -2882,6 +2882,18 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
     # Themed-layout path: drop the visual chrome onto the template.
     if intro_layout is not None:
         slide = prs.slides.add_slide(intro_layout)
+
+        # Dark color themes (synthetic, electronics) need a dark slide background.
+        # The template's "light panel" freeform is made transparent by
+        # _apply_color_theme(), so the slide's own background fills the gap.
+        # This must be set before placeholders are populated.
+        if theme_lower in ("synthetic", "electronics"):
+            try:
+                slide.background.fill.solid()
+                slide.background.fill.fore_color.rgb = _rgb_tuple(MERCK_PURPLE)
+            except Exception:
+                pass
+
         # Flatten tuple titles to a single string; the template's Title 1
         # uses its own typography so we don't try to honor italic runs.
         if isinstance(title, (list, tuple)) and title and \
@@ -3201,7 +3213,12 @@ def build_section_divider(prs, meta, number=None, title=None, style="merck_execu
     # ------------------------------------------------------------------
     # Preferred path: native template Divider layout.
     # ------------------------------------------------------------------
-    divider_layout = _divider_layout(prs)
+    # For dark themes (synthetic, electronics) the native Divider layout's
+    # full-slide background rectangle uses scheme:accent1, which is yellow
+    # for those themes — this would make the divider entirely yellow.
+    # Use the programmatic fallback instead so the palette bg (violet) is
+    # applied correctly.
+    divider_layout = _divider_layout(prs) if not _is_dark(style) else None
     if divider_layout is not None:
         slide = prs.slides.add_slide(divider_layout)
         # Populate number placeholder (idx 0).
