@@ -1,0 +1,8 @@
+# Merck PPTX Pipeline — dependencies
+# Install with: pip install -r requirements.txt
+
+# PowerPoint rendering engine (lxml and Pillow installed as transitive deps)
+python-pptx>=0.6.21
+
+# Claude API client — required only for the `generate` command
+anthropic>=0.25.0

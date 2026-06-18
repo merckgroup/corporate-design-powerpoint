@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# PowerPoint output files — keep only the bundled templates
+*.pptx
+!merck_pptx/templates/*.pptx
+
+# Original download files (already copied into merck_pptx/)
+/Templates/
+
+# Test / scratch files
+Test/
+
+# Claude Code session data
+.claude/
+
+# Environment / secrets
+.env
+*.env
+
+# OS
+.DS_Store
+Thumbs.db
