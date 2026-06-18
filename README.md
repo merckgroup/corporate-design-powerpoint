@@ -58,6 +58,8 @@ Merck PPTX Pipeline — deck setup
 Deck label / title (appears in footer) [Merck Presentation]:
 ```
 
+The interactive prompts cover the core six fields. To also set `division` or `color_theme`, use `--meta` (see below).
+
 ### 2 — Command line, scripted (no prompts)
 
 Three ways to skip all prompts:
@@ -119,13 +121,15 @@ build_from_plan("plan.json", "output/deck.pptx")
 
 ---
 
-## The six gate answers (`meta.json`)
+## Meta fields (`meta.json`)
 
-The six questions define the deck's identity. Pass them as a JSON file with `--meta`:
+Pass deck identity as a JSON file with `--meta`:
 
 ```json
 {
   "region":         "EU",
+  "division":       "merck",
+  "color_theme":    "plastic",
   "deck_label":     "Finance Systems Review",
   "classification": "Confidential",
   "month_year":     "June 2026",
@@ -134,30 +138,95 @@ The six questions define the deck's identity. Pass them as a JSON file with `--m
 }
 ```
 
-| Field | Required | Valid values |
-|---|---|---|
-| `region` | Yes | `EU` · `USA` |
-| `deck_label` | Yes | Any text — shown in the footer of every slide |
-| `classification` | Yes | `Public` · `Internal` · `Confidential` |
-| `month_year` | Yes | e.g. `"June 2026"` |
-| `audience` | Yes | `Executive leadership` · `Senior management` · `Functional team` · `Mixed audience` · `External / client-facing` |
-| `deck_style` | Yes | `merck_executive` · `merck_corporate` · `merck_storytelling` |
-| `variety_mode` | No | `default` (standard 27 layouts) · `creative` (all 46 layouts) |
-| `show_disclaimer` | No | `true` for external-facing decks; defaults to `false` |
+| Field | Required | Valid values | Default |
+|---|---|---|---|
+| `region` | Yes | `EU` · `USA` | — |
+| `division` | No | `merck` · `emd_electronics` · `emd_serono` · `millipore_sigma` · `merck_asia` | `merck` |
+| `color_theme` | No | `plastic` · `functional` · `organic` · `synthetic` · `technical` · `electronics` | `plastic` |
+| `deck_label` | Yes | Any text — shown in the footer of every slide | — |
+| `classification` | Yes | `Public` · `Internal` · `Confidential` | — |
+| `month_year` | Yes | e.g. `"June 2026"` | — |
+| `audience` | Yes | `Executive leadership` · `Senior management` · `Functional team` · `Mixed audience` · `External / client-facing` | — |
+| `deck_style` | No | `merck_executive` · `merck_corporate` · `merck_storytelling` | `merck_executive` |
+| `variety_mode` | No | `default` (standard layouts) · `creative` (extended set) | `default` |
+| `show_disclaimer` | No | `true` for external-facing decks | `false` |
 
-**Region is a compliance issue.** EU decks use the Merck KGaA template (Darmstadt identity). USA/Canada decks use the EMD / MilliporeSigma / EMD Electronics template, which carries a legal disclaimer restricting it to North America. Never mix the two.
+**`region` is a compliance issue.** EU decks use the Merck KGaA (Darmstadt) template. USA/Canada decks carry a legal disclaimer restricting them to North America. Never mix the two.
 
 **`Secret` blocks the build.** If `Secret` is entered as classification, the pipeline exits immediately.
+
+> **How `division` and `color_theme` interact:** `division` selects the template *file* (determines which logo and disclaimer appear on every slide). `color_theme` changes the *colour palette* (applied in code, no extra file needed). Set them independently — any combination works.
+
+---
+
+## Template selection — how the tool picks the right file
+
+Three meta fields control the visual output. They are **independent** — any combination works:
+
+```
+region      →  which brand template FILE is loaded   (compliance)
+division    →  which sub-brand within that region    (logo / disclaimer)
+color_theme →  which colour scheme is applied        (design, no extra file needed)
+```
+
+### `region` — compliance boundary
+
+| Value | Template family | When to use |
+|---|---|---|
+| `EU` (default) | `EU_Merck_Themed.pptx` | Merck KGaA, Darmstadt identity — all EU/global audiences |
+| `USA` | `USA_Merck_Themed_Base_v1.pptx` | North America only — carries the legal EMD disclaimer |
+
+⚠ **Region is a compliance issue.** USA templates carry a legal disclaimer that restricts them to North America. Never send a USA-region deck to a non-NA audience.
+
+### `division` — brand / logo variant
+
+Selects the template file for your sub-brand. Each file carries the correct logo, wordmark and disclaimer for that division. Missing files fall back to the Merck default for that region — no error.
+
+| Value | Template file (EU) | Template file (USA) |
+|---|---|---|
+| `merck` *(default)* | `EU_Merck_Themed.pptx` ✅ included | `USA_Merck_Themed_Base_v1.pptx` ✅ included |
+| `emd_electronics` | `EU_EMDElectronics_Themed.pptx` | `USA_EMDElectronics_Themed.pptx` |
+| `emd_serono` | `EU_EMDSerono_Themed.pptx` | `USA_EMDSerono_Themed.pptx` |
+| `millipore_sigma` | `EU_MilliporeSigma_Themed.pptx` | `USA_MilliporeSigma_Themed.pptx` |
+| `merck_asia` | `EU_MerckAsia_Themed.pptx` | `USA_MerckAsia_Themed.pptx` |
+
+**Adding a division template:** export the master template from empower (`Corporate Design Templates → Master Templates → {Division}`) as a `.pptx` file, name it according to the table above, and place it in `merck_pptx/templates/`. The pipeline picks it up automatically.
+
+### `color_theme` — colour scheme
+
+Applied **programmatically** — no extra template file needed. The pipeline modifies the loaded template's PowerPoint theme XML in memory before building any slides, so every cover, section divider, and content slide matches the chosen colour palette.
+
+| Value | Background | Accent colour | Best for |
+|---|---|---|---|
+| `plastic` *(default)* | Lime green `#A5CD50` | Pink `#EB3C96` | General-purpose Merck Plastic cell design |
+| `functional` | Lime green `#A5CD50` | Teal `#2DBECD` | Life science, biology, organic cell imagery |
+| `organic` | Cream `#FFDCB9` | Red `#E61E50` | Healthcare, patient focus, warm narrative |
+| `synthetic` | Violet `#503291` dark | Yellow `#FFC832` | Industrial, chemistry, manufacturing |
+| `technical` | Cream `#FFDCB9` | Teal `#2DBECD` | Engineering, IT, technical audiences |
+| `electronics` | Violet `#503291` dark | Yellow `#FFC832` | EMD Electronics; cover has an editable photo placeholder |
+
+The `electronics` cover uses the template's "Title with picture" layout. The image placeholder is left empty — fill it in PowerPoint after generation.
+
+### Putting it together — examples
+
+```json
+{ "region": "EU",  "division": "merck",            "color_theme": "plastic"     }
+{ "region": "EU",  "division": "merck",            "color_theme": "organic"     }
+{ "region": "USA", "division": "emd_electronics",  "color_theme": "electronics" }
+{ "region": "EU",  "division": "millipore_sigma",  "color_theme": "synthetic"   }
+```
+
+Omit any field to get its default (`EU` · `merck` · `plastic`).
 
 ---
 
 ## Visual styles
 
-Three locked palettes control color, card backgrounds, and typography. Structural discipline — action titles, takeaway bands, chrome — is always present regardless of style.
+Three locked palettes control card backgrounds, typography, and chrome colour on **content slides**. The `deck_style` is orthogonal to `color_theme` — you can use any style with any colour theme.
 
 | Style | Background | Character | Best for |
 |---|---|---|---|
-| `merck_executive` | White | Grayscale + single purple accent | CFO updates, board presentations, M&A |
+| `merck_executive` | White | Grayscale + single accent | CFO updates, board presentations, M&A |
 | `merck_corporate` | White | Purple, yellow, aqua, gold | Project updates, town halls, cross-functional |
 | `merck_storytelling` | Dark purple (`#3A2468`) | Gold dominant, white text | Product launches, change management |
 
@@ -175,6 +244,8 @@ To control every slide yourself, write a plan JSON and pass it to `build_from_pl
 {
   "meta": {
     "region":                    "EU",
+    "division":                  "merck",
+    "color_theme":               "organic",
     "deck_label":                "Q2 Finance Review",
     "classification":            "Confidential",
     "month_year":                "June 2026",
@@ -340,20 +411,27 @@ These are the most frequent errors when writing plan JSON manually. Wrong conten
 | Layout | Use this key | Not this |
 |---|---|---|
 | `two_column`, `before_after` columns | `items` | `bullets`, `points`, `list` |
-| `decision_rows` decisions | `title` + `desc` | `decision`, `body`, `text` |
+| `decision_rows` decisions | `text` (single string body) OR `title` + `desc` | `decision`, `body`, `description` |
+| `before_after` panel labels | `before.label` / `after.label` (nested) OR `before_label` / `after_label` (flat) | hard-coded TODAY/TOMORROW |
+| `milestone_timeline` milestones | `label` + `description` (or `title` + `body`) | any other key names |
+| `milestone_timeline` status | `"upcoming"` · `"completed"` · `"active"` | `"future"` · `"done"` · `"current"` |
+| `status_table` | `rows` only — columns auto-derived | explicit `columns` not required |
+| `comparison_table` | `headers` + `rows` (matrix) OR `options` + `features` | any other key names |
+| `waterfall_slide` bar types | `"total"` · `"positive"` · `"negative"` | `"start"` · `"up"` · `"down"` |
+| `risk_heatmap` scores | `likelihood: 1–5` + `impact: 1–5` (integers) | `"high"` · `"low"` strings |
+| `journey_map` | `rows` (with `actor` + `steps`) OR `actors` (with `name` + `cells`) | — |
+| `chart_slide` data | `chart: {type, data: {categories, series}}` | `items` list format |
+| `chart_slide` layout key | `chart_slide` | `chart` |
+| `waterfall_slide` layout key | `waterfall_slide` | `waterfall` |
+| `2x2_matrix` layout key | `2x2_matrix` | `matrix_2x2` |
 | `2x2_matrix` quadrant cells | `items` (list of strings) | `body`, `text`, `content` |
-| `phase_process` highlight | `status: "current"` | `highlighted: true` (deprecated) |
+| `phase_process` highlight | `highlighted: true` | `status: "current"` |
 | `funnel` | `inputs` + `output` | `stages` |
-| `journey_map` | `actors` | `rows` |
 | `fishbone` | `bones` | `causes` |
-| `comparison_table` | `options` + `features` | `headers` + `rows` |
 | `influence_diagram` forces | `forces` (with `side` + `tone`) | `nodes` |
 | `venn` overlap text | `intersection` | `overlap` |
 | `hub_spoke` center | `hub: {label, title, subtitle}` | `center: "string"` |
 | `close` body | `action_statement` | `statement` |
-| `chart_slide` layout key | `chart_slide` | `chart` |
-| `waterfall_slide` layout key | `waterfall_slide` | `waterfall` |
-| `2x2_matrix` layout key | `2x2_matrix` | `matrix_2x2` |
 
 ---
 
