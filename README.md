@@ -1,6 +1,6 @@
 # Merck Corporate Design PPTX Tool
 
-Convert a markdown brief, an existing PowerPoint, or a structured slide plan into a polished **Merck Healthcare KGaA-branded deck** — without opening PowerPoint.
+Convert an existing PowerPoint, a markdown brief, or a structured slide plan into a polished **Merck Healthcare KGaA-branded deck** without opening PowerPoint.
 
 > **Installation and setup:** see [SETUP.md](SETUP.md).
 
@@ -11,7 +11,7 @@ Convert a markdown brief, an existing PowerPoint, or a structured slide plan int
 This pipeline is the code implementation of the **Merck Slide Agent** MyGPT by **Anoop Kumar (LS-CL-CD)**:
 [mygpt-suite.uptimize.merckgroup.com — Merck Slide Agent](https://mygpt-suite.uptimize.merckgroup.com/chat?a=7cdc5dfe-47a8-4009-ac3f-4f95f6a3114e)
 
-The MyGPT agent runs interactively in the Merck internal environment and produces slide plans through a guided conversation. This repository takes that agent's structural discipline — layout catalog, quality rules, brand enforcement, and plan schema — and turns it into a standalone Python pipeline that any tool or script can call programmatically.
+The MyGPT agent runs interactively in the Merck internal environment and produces slide plans through a guided conversation. This repository takes that agent's structural discipline: layout catalog, quality rules, brand enforcement, and plan schema — and turns it into a standalone Python pipeline that any tool or script can call programmatically.
 
 ---
 
@@ -23,7 +23,7 @@ The pipeline accepts three types of input and always produces a `.pptx` file:
 |---|---|
 | **Markdown document** (`.md`) | Claude reads your content, generates a slide plan, and builds the deck |
 | **Existing PowerPoint** (`.pptx` / `.ppt`) | Claude extracts the content, re-plans it in Merck style, and builds it fresh |
-| **Plan JSON** (`.json` or Python dict) | Builds directly — no Claude, fully deterministic |
+| **Plan JSON** (`.json` or Python dict) | Builds directly, no Claude, fully deterministic |
 
 Every output deck follows the Merck brand: Merck purple, gold accents, action titles on every slide, takeaway bands, classification badges, section circles, and a consistent footer.
 

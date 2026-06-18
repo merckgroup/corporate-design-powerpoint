@@ -372,15 +372,18 @@ def _build_vertical_numbered(prs, meta, slide, total):
 
 def _build_waterfall_slide(prs, meta, slide, total):
     c = _content(slide)
+    chart = c.get("chart") or {}
+    # Schema: content.chart.data.bars — extract bars for the layout function.
+    bars = chart.get("data", {}).get("bars") or chart.get("bars") or []
     return build_waterfall_slide(
         prs, meta,
         action_title=slide.get("action_title", ""),
-        chart=c.get("chart", {}),
+        bars=bars,
         takeaway=slide.get("takeaway", ""),
         source=slide.get("source"),
-        callouts=c.get("callouts"),
         footnotes=c.get("footnotes"),
         methodology_note=c.get("methodology_note"),
+        subtitle=slide.get("subtitle"),
         **_common_kwargs(slide, meta, total),
     )
 
@@ -671,7 +674,7 @@ def _build_journey_map(prs, meta, slide, total):
         prs, meta,
         action_title=slide.get("action_title", ""),
         phases=c.get("phases", []),
-        actors=c.get("actors", []),      # schema key: actors (not rows)
+        rows=c.get("actors", []),         # schema key: actors; layout key: rows
         takeaway=slide.get("takeaway", ""),
         source=slide.get("source"),
         subtitle=slide.get("subtitle"),
@@ -936,6 +939,14 @@ def build_from_plan(plan, output_path, base_pptx: Optional[str] = None,
         raise ValueError(
             f"output_path must end with .pptx, got: '{output_path.suffix}'"
         )
+
+    # Auto-sanitize: truncate any takeaway that exceeds the 120-char hard limit.
+    # The LLM occasionally overshoots by a few characters; truncating silently is
+    # preferable to failing the entire build over a marginal violation.
+    for slide in plan.get("slides") or []:
+        for loc in (slide, slide.get("content") or {}):
+            if isinstance(loc.get("takeaway"), str) and len(loc["takeaway"]) > 120:
+                loc["takeaway"] = loc["takeaway"][:117] + "..."
 
     # Auto-fill agenda chapters before validation sees the plan.
     _autofill_agenda(plan)

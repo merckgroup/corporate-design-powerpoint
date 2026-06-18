@@ -271,35 +271,46 @@ def generate_plan(raw_content: str, meta: dict) -> dict:
         f"<source_document>\n{raw_content}\n</source_document>"
     )
 
-    response = client.messages.create(
-        model=model,
-        max_tokens=8192,
-        system=_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": user_message}],
-    )
+    last_exc: Exception | None = None
+    raw_json = ""
+    for attempt in range(1, 4):
+        with client.messages.stream(
+            model=model,
+            max_tokens=16384,
+            system=_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_message}],
+        ) as stream:
+            final = stream.get_final_message()
 
-    raw_json = response.content[0].text.strip()
+        raw_json = final.content[0].text.strip()
 
-    # Strip only the outer markdown code fence if the model added one.
-    # We cannot strip all lines starting with ``` because JSON string values
-    # may legitimately contain code fences (e.g. in notes fields).
-    if raw_json.startswith("```"):
-        lines = raw_json.splitlines()
-        # Find the closing fence line (last line starting with ```)
-        end = len(lines)
-        for i in range(len(lines) - 1, 0, -1):
-            if lines[i].startswith("```"):
-                end = i
-                break
-        raw_json = "\n".join(lines[1:end]).strip()
+        # Strip only the outer markdown code fence if the model added one.
+        # We cannot strip all lines starting with ``` because JSON string values
+        # may legitimately contain code fences (e.g. in notes fields).
+        if raw_json.startswith("```"):
+            lines = raw_json.splitlines()
+            # Find the closing fence line (last line starting with ```)
+            end = len(lines)
+            for i in range(len(lines) - 1, 0, -1):
+                if lines[i].startswith("```"):
+                    end = i
+                    break
+            raw_json = "\n".join(lines[1:end]).strip()
 
-    try:
-        return json.loads(raw_json)
-    except json.JSONDecodeError as exc:
-        # Limit preview to 120 chars — avoids leaking document content into
-        # logs or error reports if the response accidentally echoed input.
-        preview = raw_json[:120].encode("unicode_escape").decode()
-        raise ValueError(
-            f"Claude returned non-JSON response. Parsing error: {exc}. "
-            f"Response preview: {preview!r}"
-        ) from exc
+        try:
+            return json.loads(raw_json)
+        except json.JSONDecodeError as exc:
+            last_exc = exc
+            if attempt < 3:
+                print(
+                    f"WARNING: JSON parse error on attempt {attempt}, retrying... ({exc})",
+                    file=sys.stderr,
+                )
+
+    # All attempts failed — raise with limited preview to avoid log pollution.
+    preview = raw_json[:120].encode("unicode_escape").decode()
+    raise ValueError(
+        f"Claude returned non-JSON response after 3 attempts. "
+        f"Last error: {last_exc}. "
+        f"Response preview: {preview!r}"
+    ) from last_exc
