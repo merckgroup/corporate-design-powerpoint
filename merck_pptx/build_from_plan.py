@@ -27,6 +27,13 @@ try:
 except ImportError:
     import xml.etree.ElementTree as _ET
     _HAS_LXML = False
+    import warnings as _lxml_warnings
+    _lxml_warnings.warn(
+        "lxml is not installed. The 'synthetic' and 'electronics' color themes will "
+        "render with an incorrect background color. Install lxml to fix: pip install lxml",
+        ImportWarning,
+        stacklevel=2,
+    )
 
 from merck_pptx.merck_layouts import (
     open_deck, save_deck, AUTO_PROMOTE_EXECUTIVE,
@@ -435,11 +442,13 @@ def _wire_agenda_hyperlinks(prs, ordered_slides: list) -> None:
                 continue
             key = name.split("_", 1)[1]
             target_idx = sn_to_idx.get(key)
-        if target_idx is None:
-            stripped = key.lstrip("0")
-            if stripped:
-                target_idx = sn_to_idx.get(stripped)
             if target_idx is None:
+                stripped = key.lstrip("0")
+                if stripped:
+                    target_idx = sn_to_idx.get(stripped)
+            if target_idx is None:
+                print(f"WARNING: agenda hyperlink '{name}' — no slide with section_number '{key}'",
+                      file=sys.stderr)
                 continue
             try:
                 add_slide_jump_hyperlink(shp, prs.slides[target_idx])
