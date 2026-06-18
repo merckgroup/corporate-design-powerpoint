@@ -25,6 +25,9 @@ env/
 Test/
 output/
 
+# Internal guidelines and source PDFs (not for distribution)
+Guidelines/
+
 # Claude Code session data
 .claude/
 CLAUDE.md
