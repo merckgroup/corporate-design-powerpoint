@@ -33,14 +33,14 @@ def _get_env(primary: str, fallback: str) -> str | None:
     if sys.platform == "win32":
         try:
             import winreg
-            k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment")
-            for name in (primary, fallback):
-                try:
-                    val, _ = winreg.QueryValueEx(k, name)
-                    if val:
-                        return val
-                except FileNotFoundError:
-                    pass
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as k:
+                for name in (primary, fallback):
+                    try:
+                        val, _ = winreg.QueryValueEx(k, name)
+                        if val:
+                            return val
+                    except FileNotFoundError:
+                        pass
         except Exception:
             pass
     return None
@@ -79,7 +79,7 @@ no code fences. The JSON must conform exactly to the schema below.
                                         // Executive Summary, Hero Stat, Pull Quote
       "style":          "inherit" | "merck_executive" | "merck_corporate" | "merck_storytelling",
       "category":       string | null,  // UPPERCASE tag e.g. "DIAGNOSIS"
-      "takeaway":       string | null,  // ≤120 chars
+      "takeaway":       string | null,  // ≤90 chars (see rule 2 and rule 7)
       "source":         string | null,
       "notes":          string | null,
       "content":        object          // layout-specific payload (see below)
@@ -182,7 +182,7 @@ Visual / story:
    Preferred: "<INSIGHT>; <CONSEQUENCE>" — use semicolons, not em dashes.
    Max 80 characters. Use numbers over adjectives ("OEE improved 5.4 points to 84%").
 
-2. takeaway is the one-sentence "so what" of the slide. Max 120 characters.
+2. takeaway is the one-sentence "so what" of the slide. Max 90 characters.
    Omit takeaway on Cover, Agenda, Section Divider, Close.
 
 3. section_number: assign unique sequential integers starting at 1 to all
@@ -199,6 +199,22 @@ Visual / story:
 
 6. The first slide is always the cover, the last is always the close.
    Include an agenda slide as slide 2 if there are 5 or more content slides.
+
+7. Content length limits — the renderer uses fixed-size text boxes; exceeding
+   these limits causes text to overflow or be clipped in the output deck:
+   - takeaway: ≤90 chars (rule 2 above)
+   - action_title (non-cover slides): ≤80 chars
+   - exec_summary key_messages[].body: ≤120 chars
+   - two/three/four_column left/right body, items[] each item: ≤120 chars
+   - decision_rows decisions[].desc: ≤160 chars
+   - phase_process phases[].body: ≤100 chars per phase
+   - milestone_timeline milestones[].body: ≤80 chars per milestone
+   - hub_spoke spokes[].body: ≤100 chars per spoke
+   - topic_set topics[].body: ≤120 chars per topic
+   - label_rows rows[].body: ≤130 chars per row
+   - status_table cell values: ≤45 chars per cell
+   - When content is dense, prefer fewer items with tighter text over
+     many items with long text.
 """
 
 # Module-level cached client — constructed lazily on first generate_plan() call.
@@ -254,7 +270,8 @@ def generate_plan(raw_content: str, meta: dict) -> dict:
     ValueError
         If Claude's response is not parseable JSON.
     """
-    model = os.environ.get("AIP_MODEL", _DEFAULT_MODEL)
+    # AIP_MODEL resolved via registry-aware _get_env, consistent with AIP_BASE_URL / AIP_TOKEN.
+    model = _get_env("AIP_MODEL", "AIP_MODEL") or _DEFAULT_MODEL
     client = _get_client()
 
     # Source content is wrapped in XML tags to create a clear boundary between
@@ -271,17 +288,25 @@ def generate_plan(raw_content: str, meta: dict) -> dict:
         f"<source_document>\n{raw_content}\n</source_document>"
     )
 
-    last_exc: Exception | None = None
-    raw_json = ""
+    last_exc: Exception
+    raw_json: str = ""
     for attempt in range(1, 4):
         with client.messages.stream(
             model=model,
             max_tokens=16384,
-            system=_SYSTEM_PROMPT,
+            system=[{
+                "type": "text",
+                "text": _SYSTEM_PROMPT,
+                "cache_control": {"type": "ephemeral"},
+            }],
             messages=[{"role": "user", "content": user_message}],
         ) as stream:
             final = stream.get_final_message()
 
+        if not final.content or not hasattr(final.content[0], "text"):
+            raise ValueError(
+                f"Unexpected response structure from Claude: {final.content!r}"
+            )
         raw_json = final.content[0].text.strip()
 
         # Strip only the outer markdown code fence if the model added one.

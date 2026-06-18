@@ -1,5 +1,21 @@
 import re
 
+
+def _title_text(value: object) -> str:
+    """Extract plain text from an action_title value.
+
+    action_title can be a plain str or a list of (text, italic_bool) tuples
+    for rich (italicised) text. This normaliser handles both so length checks
+    and regex searches work correctly for both formats.
+    """
+    if isinstance(value, (list, tuple)):
+        return "".join(
+            seg[0] if isinstance(seg, (list, tuple)) else str(seg)
+            for seg in value
+        )
+    return str(value) if value is not None else ""
+
+
 _STRUCTURAL_FUNCTIONS = frozenset({
     "Cover", "Agenda", "Section Divider", "Close",
     "Executive Summary", "Hero Stat", "Pull Quote",
@@ -114,15 +130,25 @@ def validate_plan(plan: dict) -> list:
                 f"is a content slide but has no section_number."
             )
 
+        # Warn: action_title length on non-cover slides (max 80 chars).
+        # _title_text handles both str and list-of-(text, italic_bool) formats.
+        if layout != "cover" and fn_norm != "cover":
+            raw_title = _title_text(s.get("action_title"))
+            if raw_title and len(raw_title) > 80:
+                warnings.append(
+                    f"Slide page={s.get('page')}: action_title is {len(raw_title)} chars (max 80)."
+                )
+
         # Hard: cover title > 60 chars or missing subtitle
         if layout == "cover" or fn_norm == "cover":
             raw = s.get("action_title") or ""
-            title_text = raw.split(";", 1)[0].strip() if ";" in raw else raw
+            plain = _title_text(raw)
+            title_text = plain.split(";", 1)[0].strip() if ";" in plain else plain
             if len(title_text) > 60:
                 raise ValidationError(
                     f"Cover title too long ({len(title_text)} chars, max 60): {title_text!r}"
                 )
-            has_sub = (";" in raw and raw.split(";", 1)[1].strip()) or \
+            has_sub = (";" in plain and plain.split(";", 1)[1].strip()) or \
                       (s.get("content") or {}).get("subtitle")
             if not has_sub:
                 raise ValidationError("Cover slide is missing a subtitle.")
@@ -142,7 +168,7 @@ def validate_plan(plan: dict) -> list:
                     )
 
         # Warn: title count word vs content item count mismatch
-        title = (s.get("action_title") or "").lower()
+        title = _title_text(s.get("action_title")).lower()
         m = re.search(r"\b(two|three|four|five|six|seven|eight)\b", title)
         if m:
             expected = _COUNT_WORDS[m.group(1)]

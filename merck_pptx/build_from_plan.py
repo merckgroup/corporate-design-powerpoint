@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import json
 import pathlib
-import re
 import sys
 from typing import Optional
 
@@ -92,14 +91,25 @@ def _place_image(slide, img_spec: dict) -> None:
     if not raw_path:
         return
 
-    # Security: validate the path is an actual image file before embedding.
-    # Prevents a crafted plan (e.g. via prompt injection) from embedding
-    # arbitrary local files by setting image.path to a non-image path.
-    img_path = pathlib.Path(raw_path)
+    # Security: validate the path before embedding.
+    # (1) Extension check — prevents arbitrary file types from being embedded.
+    # (2) Directory jail — restricts images to the current working directory tree
+    #     to prevent a crafted plan from exfiltrating arbitrary local files
+    #     (e.g. via prompt injection setting image.path to a sensitive path).
+    img_path = pathlib.Path(raw_path).resolve()
     if img_path.suffix.lower() not in _SAFE_IMAGE_EXTENSIONS:
         print(
             f"WARNING: image not placed — '{img_path.name}' is not a recognised image type. "
             f"Allowed: {sorted(_SAFE_IMAGE_EXTENSIONS)}",
+            file=sys.stderr,
+        )
+        return
+    _allowed_image_root = pathlib.Path.cwd().resolve()
+    if not str(img_path).startswith(str(_allowed_image_root)):
+        print(
+            f"WARNING: image not placed — '{img_path}' is outside the allowed "
+            f"directory ({_allowed_image_root}). Move the image file inside the "
+            f"project directory.",
             file=sys.stderr,
         )
         return
@@ -905,6 +915,92 @@ _DISPATCH = {
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+# Plan sanitization helpers
+# ---------------------------------------------------------------------------
+
+def _trunc(s: object, limit: int) -> object:
+    """Truncate a string to `limit` chars, appending '...' if trimmed."""
+    if not isinstance(s, str) or len(s) <= limit:
+        return s
+    if limit <= 3:
+        return s[:limit]
+    return s[:limit - 3] + "..."
+
+
+def _sanitize_obj(obj: object, rules: dict) -> None:
+    """Apply truncation rules to a dict, mutating in place."""
+    if not isinstance(obj, dict):
+        return
+    for field, limit in rules.items():
+        if isinstance(obj.get(field), str):
+            obj[field] = _trunc(obj[field], limit)
+
+
+# Per-field character limits (must align with rendering engine constraints).
+# Top-level slide fields:
+_SLIDE_LIMITS = {"action_title": 80}
+# Content fields — applied at every dict level (top-level content and list items).
+# Using one dict for both avoids divergence and closes the gap where list-item
+# fields like "context" (used in kpi_dashboard) were not being truncated.
+_CONTENT_FIELD_LIMITS = {
+    "takeaway": 120,
+    "body":     130,
+    "desc":     160,
+    "context":  130,
+    "note":     80,
+}
+
+
+def _sanitize_content(content: object) -> None:
+    """Recursively sanitize content dict: truncate known long-text fields."""
+    if not isinstance(content, dict):
+        return
+    _sanitize_obj(content, _CONTENT_FIELD_LIMITS)
+    for val in content.values():
+        if isinstance(val, list):
+            for item in val:
+                if isinstance(item, dict):
+                    _sanitize_obj(item, _CONTENT_FIELD_LIMITS)
+                    for nested_val in item.values():
+                        if isinstance(nested_val, list):
+                            for nested_item in nested_val:
+                                if isinstance(nested_item, dict):
+                                    _sanitize_obj(nested_item, _CONTENT_FIELD_LIMITS)
+        elif isinstance(val, dict):
+            _sanitize_content(val)
+
+
+def _sanitize_plan(plan: dict) -> None:
+    """Truncate overflow-prone fields across all slides before validation."""
+    meta = plan.get("meta") or {}
+    for slide in plan.get("slides") or []:
+        # Takeaway lives both at slide level and inside content — handle first
+        # so _sanitize_content below doesn't double-truncate it.
+        for loc in (slide, slide.get("content") or {}):
+            if isinstance(loc.get("takeaway"), str) and len(loc["takeaway"]) > 120:
+                loc["takeaway"] = _trunc(loc["takeaway"], 120)
+
+        # Cover slide: ensure a subtitle is present (either "Title; Subtitle" in
+        # action_title, or a standalone subtitle field).  The LLM occasionally
+        # omits it; auto-patch using the deck_label rather than hard-failing.
+        # Do this BEFORE _sanitize_obj so the combined string is truncated together.
+        if slide.get("layout") == "cover":
+            raw = (slide.get("action_title") or "").rstrip().rstrip(";").rstrip()
+            has_sub = (";" in (slide.get("action_title") or "") and
+                       (slide.get("action_title") or "").split(";", 1)[1].strip()) or \
+                      (slide.get("subtitle") or "").strip() or \
+                      ((slide.get("content") or {}).get("subtitle") or "").strip()
+            if not has_sub:
+                deck_label = meta.get("deck_label") or "Merck Presentation"
+                combined = (raw + "; " + deck_label) if raw else deck_label
+                # Keep within 60-char cover-title limit (merck_layouts enforces this).
+                slide["action_title"] = _trunc(combined, 60)
+
+        _sanitize_obj(slide, _SLIDE_LIMITS)
+        _sanitize_content(slide.get("content") or {})
+
+
+# ---------------------------------------------------------------------------
 
 def build_from_plan(plan, output_path, base_pptx: Optional[str] = None,
                     strict: bool = True) -> str:
@@ -940,13 +1036,10 @@ def build_from_plan(plan, output_path, base_pptx: Optional[str] = None,
             f"output_path must end with .pptx, got: '{output_path.suffix}'"
         )
 
-    # Auto-sanitize: truncate any takeaway that exceeds the 120-char hard limit.
-    # The LLM occasionally overshoots by a few characters; truncating silently is
-    # preferable to failing the entire build over a marginal violation.
-    for slide in plan.get("slides") or []:
-        for loc in (slide, slide.get("content") or {}):
-            if isinstance(loc.get("takeaway"), str) and len(loc["takeaway"]) > 120:
-                loc["takeaway"] = loc["takeaway"][:117] + "..."
+    # Auto-sanitize: truncate fields that overflow fixed-dimension text boxes in the
+    # rendering engine. Truncation is a silent safety net — the LLM prompt instructs
+    # the model to stay within these limits, but the build should not fail on overshoot.
+    _sanitize_plan(plan)
 
     # Auto-fill agenda chapters before validation sees the plan.
     _autofill_agenda(plan)

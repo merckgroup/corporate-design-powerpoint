@@ -33,7 +33,7 @@ Every output deck follows the Merck brand: Merck purple, gold accents, action ti
 
 ### 1 — Command line, interactive
 
-The simplest path. Run `generate` without `--meta` and the pipeline asks six questions before calling Claude:
+Run `generate` without `--meta` or `--defaults` and the pipeline asks six questions before calling Claude:
 
 ```bash
 python -m merck_pptx generate brief.md output/deck.pptx
@@ -58,16 +58,37 @@ Merck PPTX Pipeline — deck setup
 Deck label / title (appears in footer) [Merck Presentation]:
 ```
 
-### 2 — Command line, scripted
+### 2 — Command line, scripted (no prompts)
 
-Supply the answers upfront as a JSON file — no prompts, suitable for automation:
+Three ways to skip all prompts:
 
 ```bash
-# Convert markdown to Merck deck
+# --meta: supply your answers as a JSON file
 python -m merck_pptx generate brief.md output/deck.pptx --meta meta.json
 
+# --defaults: use built-in defaults (EU, Internal, Executive leadership, merck_executive)
+python -m merck_pptx generate brief.md output/deck.pptx --defaults
+
+# Pipe / CI: stdin not a TTY automatically activates defaults
+echo "" | python -m merck_pptx generate brief.md output/deck.pptx
+```
+
+Use `--save-plan` to save the LLM-generated slide plan as JSON alongside the deck — useful for inspecting or tweaking the plan and rebuilding without another LLM call:
+
+```bash
+python -m merck_pptx generate brief.md output/deck.pptx \
+    --meta meta.json \
+    --save-plan output/plan.json
+
+# Tweak plan.json, then rebuild without LLM:
+python -m merck_pptx build output/plan.json output/deck_revised.pptx
+```
+
+Re-brand an existing PowerPoint or build from a finished plan:
+
+```bash
 # Re-brand an existing PowerPoint
-python -m merck_pptx generate old_deck.pptx output/deck_merck.pptx --meta meta.json
+python -m merck_pptx generate old_deck.pptx output/deck_merck.pptx --defaults
 
 # Build from a finished plan (no Claude required)
 python -m merck_pptx build plan.json output/deck.pptx
@@ -88,7 +109,10 @@ generate_deck("brief.md", "output/deck.pptx", meta={
     "deck_style":     "merck_executive",
 })
 
-# Plan dict → Merck deck (no Claude)
+# Optionally save the generated plan for inspection or re-use
+generate_deck("brief.md", "output/deck.pptx", meta={...}, save_plan="output/plan.json")
+
+# Plan dict or file → Merck deck (no Claude)
 build_from_plan(plan_dict, "output/deck.pptx")
 build_from_plan("plan.json", "output/deck.pptx")
 ```

@@ -57,51 +57,116 @@ usage: python -m merck_pptx [-h] {generate,build} ...
 
 ## Foundry AIP credentials
 
-The `generate` command calls Claude via Merck's Foundry AIP environment. Two environment variables must be set before using it. The `build` command (plan JSON → `.pptx`) does not require them.
+The `generate` command calls Claude via Merck's internal AI platform. The `build` command (plan JSON to `.pptx`) does not require any credentials.
 
-| Variable | Required for `generate` | Description |
-|---|---|---|
-| `AIP_BASE_URL` | Yes | Foundry AIP endpoint URL (ask your AIP administrator) |
-| `AIP_TOKEN` | Yes | Your personal Foundry API token |
-| `AIP_MODEL` | No | Model override — defaults to `claude-sonnet-4-6` |
+### Environment variables (checked in priority order)
+
+| Primary name | Fallback name | Required for `generate` | Description |
+|---|---|---|---|
+| `AIP_BASE_URL` | `ANTHROPIC_BASE_URL` | Yes | AI platform endpoint URL |
+| `AIP_TOKEN` | `ANTHROPIC_AUTH_TOKEN` | Yes | Your personal API token |
+| `AIP_MODEL` | — | No | Model override (default: `claude-sonnet-4-6`) |
+
+The pipeline checks the primary name first, then falls back to the alternative name. On Windows, it also searches `HKCU\Environment` in the registry, so variables set via PowerShell's `[Environment]::SetEnvironmentVariable` are found automatically without restarting the terminal.
 
 ### Setting the variables
+
+> **Security note:** Never paste a token as a literal in a command — it will be saved to your shell history. Use the masked-input forms below instead.
 
 **Windows — PowerShell (persistent, current user):**
 
 ```powershell
-[Environment]::SetEnvironmentVariable("AIP_BASE_URL", "https://your-instance.palantirfoundry.com/api/v1", "User")
-[Environment]::SetEnvironmentVariable("AIP_TOKEN", "your-token-here", "User")
+# AIP_BASE_URL is not sensitive — paste the URL directly
+[Environment]::SetEnvironmentVariable("AIP_BASE_URL", "https://your-instance.example.com/api/v1", "User")
+
+# AIP_TOKEN — entered via a masked prompt so it is never written to history
+$_t = Read-Host "Paste your AIP_TOKEN" -AsSecureString
+[Environment]::SetEnvironmentVariable(
+    "AIP_TOKEN",
+    [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+        [Runtime.InteropServices.Marshal]::SecureStringToBSTR($_t)),
+    "User")
+Remove-Variable _t
 ```
 
-Restart your terminal after running these commands.
+The pipeline reads these from the registry on next run — no terminal restart needed.
 
 **Windows — current session only:**
 
 ```powershell
-$env:AIP_BASE_URL = "https://your-instance.palantirfoundry.com/api/v1"
-$env:AIP_TOKEN    = "your-token-here"
+$env:AIP_BASE_URL = "https://your-instance.example.com/api/v1"
+$env:AIP_TOKEN    = [Runtime.InteropServices.Marshal]::PtrToStringAuto(
+    [Runtime.InteropServices.Marshal]::SecureStringToBSTR(
+        (Read-Host "Paste your AIP_TOKEN" -AsSecureString)))
 ```
 
-**bash / zsh:**
+**bash / zsh (current session):**
 
 ```bash
-export AIP_BASE_URL="https://your-instance.palantirfoundry.com/api/v1"
-export AIP_TOKEN="your-token-here"
+export AIP_BASE_URL="https://your-instance.example.com/api/v1"
+read -rs AIP_TOKEN && export AIP_TOKEN   # hidden input, not saved to history
 ```
 
-Add these lines to `~/.bashrc` or `~/.zshrc` to make them permanent.
+To persist across sessions, add the `AIP_BASE_URL` export to `~/.bashrc` or `~/.zshrc`. Run the `read -rs` line each time you open a terminal. Do not write the token literal into your shell profile.
 
 ### Verify credentials
 
 ```bash
 python -c "
-import os
-url   = os.environ.get('AIP_BASE_URL')
-token = os.environ.get('AIP_TOKEN')
-print('AIP_BASE_URL:', 'SET' if url   else 'MISSING')
-print('AIP_TOKEN:   ', 'SET' if token else 'MISSING')
+import os, sys
+# Check both primary and fallback names
+url   = os.environ.get('AIP_BASE_URL')   or os.environ.get('ANTHROPIC_BASE_URL')
+token = os.environ.get('AIP_TOKEN')      or os.environ.get('ANTHROPIC_AUTH_TOKEN')
+if sys.platform == 'win32' and (not url or not token):
+    try:
+        import winreg
+        k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, 'Environment')
+        if not url:
+            try: url, _ = winreg.QueryValueEx(k, 'AIP_BASE_URL')
+            except FileNotFoundError:
+                try: url, _ = winreg.QueryValueEx(k, 'ANTHROPIC_BASE_URL')
+                except FileNotFoundError: pass
+        if not token:
+            try: token, _ = winreg.QueryValueEx(k, 'AIP_TOKEN')
+            except FileNotFoundError:
+                try: token, _ = winreg.QueryValueEx(k, 'ANTHROPIC_AUTH_TOKEN')
+                except FileNotFoundError: pass
+    except Exception: pass
+print('Endpoint:', 'SET' if url   else 'MISSING')
+print('Token:   ', 'SET' if token else 'MISSING')
 "
+```
+
+---
+
+## Non-interactive / scripted usage
+
+The `generate` command can run without any prompts in three ways:
+
+```bash
+# 1. Provide answers as a JSON file
+python -m merck_pptx generate source.md output.pptx --meta meta.json
+
+# 2. Use built-in defaults (EU, Internal, Executive leadership, merck_executive)
+python -m merck_pptx generate source.md output.pptx --defaults
+
+# 3. Pipe stdin or run in CI — defaults activate automatically when stdin is not a TTY
+echo "" | python -m merck_pptx generate source.md output.pptx
+```
+
+The `build` command is always non-interactive.
+
+### Saving the generated plan
+
+Use `--save-plan` to write the LLM-generated slide plan to a JSON file alongside the deck. This lets you inspect the plan, make manual edits, and rebuild without another LLM call:
+
+```bash
+python -m merck_pptx generate source.md output.pptx \
+    --meta meta.json \
+    --save-plan plan.json
+
+# Edit plan.json, then rebuild deterministically:
+python -m merck_pptx build plan.json output_revised.pptx
 ```
 
 ---
@@ -139,16 +204,21 @@ python -m merck_pptx --help
 ```
 
 **`EnvironmentError: Missing required environment variable(s): AIP_BASE_URL, AIP_TOKEN`**
-The Foundry credentials are not set. Follow the [Foundry AIP credentials](#foundry-aip-credentials) section above.
-
-**`ValidationError: Cover slide is missing a subtitle`**
-The `action_title` on your cover slide must include a subtitle, separated by a semicolon:
-```json
-"action_title": "Your Deck Title; Your subtitle line here"
-```
+The AI platform credentials are not set. The pipeline checks both `AIP_BASE_URL`/`AIP_TOKEN` and `ANTHROPIC_BASE_URL`/`ANTHROPIC_AUTH_TOKEN`. On Windows, it also reads `HKCU\Environment` from the registry. See [Foundry AIP credentials](#foundry-aip-credentials) above.
 
 **`BuildError: page N (layout_name): ...`**
 A layout builder failed for slide N. The error message includes the original exception — read it for the specific cause. Common causes: a required content field is missing or has the wrong type. Check the layout's entry in [`merck_pptx/slide_plan_schema.md`](merck_pptx/slide_plan_schema.md).
 
+**`ValidationError: ...`**
+The slide plan contains a hard schema violation. Common causes:
+- `action_title` on the cover slide exceeds 60 characters
+- `section_number` is duplicated across slides
+- An unknown `layout` key is used
+
+If the plan was generated by the LLM, retry — the model occasionally produces slightly non-conforming plans, and the pipeline retries automatically up to 3 times.
+
 **PowerPoint opens with a "needs repair" dialog**
 This typically means a shape has a non-integer coordinate value. This can happen if a chart data value (e.g. `0.5`) was used directly as an EMU measurement in a custom layout. Report the issue with the plan JSON that produced it.
+
+**Takeaway warnings in output**
+Warnings like `Slide page=N: takeaway is X chars (approaching 120-char limit)` indicate the LLM generated a takeaway close to the rendering limit. Text above ~90 characters may wrap onto a second line that gets clipped by the fixed-height takeaway band. Shorten the takeaway in the plan JSON and rebuild with `python -m merck_pptx build`.

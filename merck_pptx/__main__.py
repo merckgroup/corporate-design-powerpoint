@@ -2,9 +2,11 @@
 CLI entry point: python -m merck_pptx <command> [args]
 
 Commands:
-  generate <source> <output.pptx> [--meta meta.json]
+  generate <source> <output.pptx> [--meta meta.json | --defaults] [--save-plan plan.json]
       Convert a .md or .pptx file to a Merck deck using Claude.
-      If --meta is omitted, 6 gate questions are asked interactively.
+      --meta      Path to a meta JSON file (skips all prompts).
+      --defaults  Use built-in default meta values (skips all prompts).
+                  Also activates automatically when stdin is not a TTY (e.g. pipes, CI).
 
   build <plan.json> <output.pptx>
       Build a Merck deck from a pre-built plan JSON. No LLM.
@@ -89,25 +91,45 @@ def _ask_meta() -> dict:
 
 _VALID_META_REGIONS          = {"EU", "USA"}
 _VALID_META_CLASSIFICATIONS  = {"Public", "Internal", "Confidential"}
-_FORBIDDEN_META_CLASSIFICATIONS = {"Secret", "Top Secret", "TS/SCI"}
+# Use upper-case so that .upper() comparison works for all variants, including
+# 'TS/SCI' which .title() would render as 'Ts/Sci' (slash resets capitalisation).
+_FORBIDDEN_META_CLASSIFICATIONS = {"SECRET", "TOP SECRET", "TS/SCI"}
+
+
+def _default_meta() -> dict:
+    """Return meta dict with built-in defaults — no prompts required."""
+    return {
+        "region":          "EU",
+        "deck_label":      "Merck Presentation",
+        "classification":  "Internal",
+        "month_year":      datetime.now().strftime("%B %Y"),
+        "audience":        "Executive leadership",
+        "deck_style":      "merck_executive",
+        "variety_mode":    "default",
+        "show_disclaimer": False,
+    }
 
 
 def _validate_meta_dict(meta: dict) -> None:
     """Validate a meta dict loaded from --meta file. Raises ValueError on bad values."""
     region = str(meta.get("region", "")).strip().upper()
-    if region and region not in _VALID_META_REGIONS:
+    # Empty or missing region is an error — silently accepting it causes the wrong
+    # template (and legal disclaimer) to be selected.
+    if region not in _VALID_META_REGIONS:
         raise ValueError(
             f"meta.region must be EU or USA, got: {region!r}"
         )
     raw_cls = str(meta.get("classification", "")).strip()
-    cls_title = raw_cls.title()
-    if cls_title in _FORBIDDEN_META_CLASSIFICATIONS:
+    cls_upper = raw_cls.upper()
+    if cls_upper in _FORBIDDEN_META_CLASSIFICATIONS:
         print(
             f"ERROR: Classification '{raw_cls}' is not permitted. Exiting.",
             file=sys.stderr,
         )
         sys.exit(1)
-    if raw_cls and cls_title not in _VALID_META_CLASSIFICATIONS:
+    # Empty or missing classification is also an error.
+    cls_title = raw_cls.title()
+    if cls_title not in _VALID_META_CLASSIFICATIONS:
         raise ValueError(
             f"meta.classification must be Public, Internal, or Confidential, got: {raw_cls!r}"
         )
@@ -124,7 +146,11 @@ def main():
     gen = sub.add_parser("generate", help="Convert .md or .pptx to Merck deck (uses Claude)")
     gen.add_argument("source", help="Source file (.md or .pptx)")
     gen.add_argument("output", help="Output .pptx path")
-    gen.add_argument("--meta", help="Path to meta JSON file (if omitted, interactive prompts)")
+    gen.add_argument("--meta", help="Path to meta JSON file (skips interactive prompts)")
+    gen.add_argument("--defaults", action="store_true",
+                     help="Use built-in default meta values without prompts")
+    gen.add_argument("--save-plan", metavar="PLAN_JSON",
+                     help="Save the LLM-generated slide plan to this JSON file")
 
     # build command
     bld = sub.add_parser("build", help="Build from a plan JSON (no LLM)")
@@ -153,12 +179,20 @@ def main():
             # Security: validate meta fields on load so a malicious or
             # misconfigured meta.json cannot bypass classification guards.
             _validate_meta_dict(meta)
+        elif args.defaults or not (sys.stdin is not None and sys.stdin.isatty()):
+            # --defaults flag, or non-TTY stdin (CI, pipes, pythonw, PyInstaller).
+            # Guard sys.stdin is not None: in some embedded runtimes stdin may be None,
+            # in which case .isatty() would raise AttributeError.
+            meta = _default_meta()
         else:
             meta = _ask_meta()
             print()
 
         try:
-            out = generate_deck(args.source, args.output, meta=meta)
+            out = generate_deck(
+                args.source, args.output, meta=meta,
+                save_plan=args.save_plan,
+            )
             print(f"Saved: {out}")
         except ValidationError as e:
             print(f"Validation error: {e}", file=sys.stderr)
