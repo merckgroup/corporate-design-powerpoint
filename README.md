@@ -2,69 +2,19 @@
 
 Convert an existing PowerPoint, a markdown brief, or a structured slide plan into a polished **Merck Healthcare KGaA-branded deck** without opening PowerPoint.
 
+## Quick Start
+
+```bash
+# From a markdown file (calls Claude — needs AIP env vars)
+python -m merck_pptx generate brief.md output/deck.pptx --defaults
+
+# From a finished plan JSON (no Claude, fully deterministic)
+python -m merck_pptx build plan.json output/deck.pptx
+```
+
 > **Installation and setup:** see [SETUP.md](SETUP.md).  
 > **Brand & design rules:** [Merck_Presentation_Guidelines.md](Merck_Presentation_Guidelines.md) — authoritative reference for colors, fonts, shapes, and accessibility.  
 > **How to use the pipeline:** [Merck_Presentation_Helper.md](Merck_Presentation_Helper.md) — practical guide for choosing layouts, writing plans, and avoiding common mistakes.
-
----
-
-## Design Guidelines
-
-Both documents live at the root of this repository:
-
-| Document | Purpose |
-|---|---|
-| [Merck_Presentation_Guidelines.md](Merck_Presentation_Guidelines.md) | Complete Merck Corporate Design rules: color palette, typography, visual styles, six color themes, 44 layout keys, shape rules, accessibility checklist, and pre-publish checklist. Authoritative reference for any design decision. |
-| [Merck_Presentation_Helper.md](Merck_Presentation_Helper.md) | Practical user guide: how to choose region / style / theme, section number rules, layout picker table, content schemas for the most common layouts, color do's and don'ts, and a pre-send checklist. |
-
-### Quick design reference
-
-**Three visual styles** (`meta.deck_style`)
-
-| Style | Background | Character |
-|---|---|---|
-| `merck_executive` | White | Formal — forced on Executive Summary, Recommendation, Decision Request, Risk, Tradeoff slides |
-| `merck_corporate` | White | General business presentations |
-| `merck_storytelling` | Dark purple | Impactful narrative, white text |
-
-**Six color themes** (`meta.color_theme`)
-
-| Theme | Cover BG | Accent | Best for |
-|---|---|---|---|
-| `plastic` *(default)* | Lime green `#A5CD50` | Pink `#EB3C96` | General purpose |
-| `functional` | Lime green `#A5CD50` | Teal `#2DBECD` | Life science |
-| `organic` | Cream `#FFDCB9` | Red `#E61E50` | Healthcare / patient |
-| `synthetic` | Violet `#503291` | Yellow `#FFC832` | Industrial / chemistry |
-| `technical` | Cream `#FFDCB9` | Teal `#2DBECD` | Engineering / IT |
-| `electronics` | Violet `#503291` | Yellow `#FFC832` | EMD Electronics (photo cover) |
-
-**Key color constants**
-
-| Role | Name | Hex |
-|---|---|---|
-| Primary brand / headings | MERCK_PURPLE | `#503291` |
-| Highlight / warm emphasis | MERCK_GOLD (Pink) | `#EB3C96` |
-| Primary body text | INK_DARK | `#1A1626` |
-| Secondary text / sources | INK_GRAY | `#555D6E` |
-| Good / positive | GOOD_GREEN | `#149B5F` |
-| Warning / amber | MERCK_YELLOW | `#FFC832` |
-| Bad / negative | BAD_RED | `#E61E50` |
-
-**Typography** — the pipeline applies all fonts automatically:
-- Action title: Verdana Regular 22 pt, Rich Purple
-- Slide heading: Verdana Bold 22 pt, Rich Purple
-- Body text: Verdana Regular (sized to layout density)
-- Source lines: Verdana Regular 8 pt, INK_GRAY
-- Footer: Verdana Regular 8 pt, Rich Purple
-
----
-
-## Origin
-
-This pipeline is the code implementation of the **Merck Slide Agent** MyGPT by **Anoop Kumar (LS-CL-CD)**:
-[mygpt-suite.uptimize.merckgroup.com — Merck Slide Agent](https://mygpt-suite.uptimize.merckgroup.com/chat?a=7cdc5dfe-47a8-4009-ac3f-4f95f6a3114e)
-
-The MyGPT agent runs interactively in the Merck internal environment and produces slide plans through a guided conversation. This repository takes that agent's structural discipline: layout catalog, quality rules, brand enforcement, and plan schema — and turns it into a standalone Python pipeline that any tool or script can call programmatically.
 
 ---
 
@@ -110,6 +60,8 @@ Merck PPTX Pipeline — deck setup
 
 Deck label / title (appears in footer) [Merck Presentation]:
 ```
+
+The default for question [5/6] adapts to your audience choice: **executive** for Executive leadership and Senior management; **corporate** for all other audiences.
 
 The interactive prompts cover the core six fields. To also set `division` or `color_theme`, use `--meta` (see below).
 
@@ -187,7 +139,9 @@ Pass deck identity as a JSON file with `--meta`:
   "classification": "Confidential",
   "month_year":     "June 2026",
   "audience":       "Executive leadership",
-  "deck_style":     "merck_executive"
+  "deck_style":     "merck_executive",
+  "variety_mode":   "default",
+  "show_disclaimer": false
 }
 ```
 
@@ -206,7 +160,7 @@ Pass deck identity as a JSON file with `--meta`:
 
 **`region` is a compliance issue.** EU decks use the Merck KGaA (Darmstadt) template. USA/Canada decks carry a legal disclaimer restricting them to North America. Never mix the two.
 
-**`Secret` blocks the build.** If `Secret` is entered as classification, the pipeline exits immediately.
+**`Secret` and above block the build.** If `Secret`, `Top Secret`, or `TS/SCI` is entered as classification, the pipeline exits immediately.
 
 > **How `division` and `color_theme` interact:** `division` selects the template *file* (determines which logo and disclaimer appear on every slide). `color_theme` changes the *colour palette* (applied in code, no extra file needed). Set them independently — any combination works.
 
@@ -331,8 +285,8 @@ To control every slide yourself, write a plan JSON and pass it to `build_from_pl
   "source":         "Source: IT Cost Audit, Q1 2026",
   "style":          "inherit",
   "content": {
-    "left":  {"label": "Current state", "items": ["SAP ECC 6.0 — EOL 2027", "14 siloed databases"]},
-    "right": {"label": "Impact",        "items": ["60% of IT opex", "3-week reporting lag"]}
+    "left":  {"header": "Current state", "items": ["SAP ECC 6.0 — EOL 2027", "14 siloed databases"]},
+    "right": {"header": "Impact",        "items": ["60% of IT opex", "3-week reporting lag"]}
   }
 }
 ```
@@ -464,13 +418,13 @@ These are the most frequent errors when writing plan JSON manually. Wrong conten
 | Layout | Use this key | Not this |
 |---|---|---|
 | `two_column`, `before_after` columns | `items` | `bullets`, `points`, `list` |
-| `decision_rows` decisions | `text` (single string body) OR `title` + `desc` | `decision`, `body`, `description` |
+| `decision_rows` decisions | `text` (maps to body) OR `title` + `desc` | `decision`, `description` |
 | `before_after` panel labels | `before.label` / `after.label` (nested) OR `before_label` / `after_label` (flat) | hard-coded TODAY/TOMORROW |
 | `milestone_timeline` milestones | `label` + `description` (or `title` + `body`) | any other key names |
-| `milestone_timeline` status | `"upcoming"` · `"completed"` · `"active"` | `"future"` · `"done"` · `"current"` |
+| `milestone_timeline` status | `"upcoming"` · `"completed"` · `"active"` — `"future"` · `"done"` · `"current"` also accepted | `"scheduled"` · `"late"` · `"overdue"` (unknown values silently become upcoming) |
 | `status_table` | `rows` only — columns auto-derived | explicit `columns` not required |
 | `comparison_table` | `headers` + `rows` (matrix) OR `options` + `features` | any other key names |
-| `waterfall_slide` bar types | `"total"` · `"positive"` · `"negative"` | `"start"` · `"up"` · `"down"` |
+| `waterfall_slide` bar types | `"total"` · `"positive"` · `"negative"` (plan-schema names); `"start"` · `"up"` · `"down"` also work as internal aliases | `"begin"` · `"increase"` · `"decrease"` |
 | `risk_heatmap` scores | `likelihood: 1–5` + `impact: 1–5` (integers) | `"high"` · `"low"` strings |
 | `journey_map` | `rows` (with `actor` + `steps`) OR `actors` (with `name` + `cells`) | — |
 | `chart_slide` data | `chart: {type, data: {categories, series}}` | `items` list format |
@@ -494,6 +448,66 @@ The complete field-by-field schema for all 46 layouts — including content payl
 
 ---
 
+## Design Guidelines
+
+Both documents live at the root of this repository:
+
+| Document | Purpose |
+|---|---|
+| [Merck_Presentation_Guidelines.md](Merck_Presentation_Guidelines.md) | Complete Merck Corporate Design rules: color palette, typography, visual styles, six color themes, 44 layout keys, shape rules, accessibility checklist, and pre-publish checklist. Authoritative reference for any design decision. |
+| [Merck_Presentation_Helper.md](Merck_Presentation_Helper.md) | Practical user guide: how to choose region / style / theme, section number rules, layout picker table, content schemas for the most common layouts, color do's and don'ts, and a pre-send checklist. |
+
+### Quick design reference
+
+**Three visual styles** (`meta.deck_style`)
+
+| Style | Background | Character |
+|---|---|---|
+| `merck_executive` | White | Formal — forced on Executive Summary, Recommendation, Decision Request, Risk, Tradeoff slides |
+| `merck_corporate` | White | General business presentations |
+| `merck_storytelling` | Dark purple | Impactful narrative, white text |
+
+**Six color themes** (`meta.color_theme`)
+
+| Theme | Cover BG | Accent | Best for |
+|---|---|---|---|
+| `plastic` *(default)* | Lime green `#A5CD50` | Pink `#EB3C96` | General purpose |
+| `functional` | Lime green `#A5CD50` | Teal `#2DBECD` | Life science |
+| `organic` | Cream `#FFDCB9` | Red `#E61E50` | Healthcare / patient |
+| `synthetic` | Violet `#503291` | Yellow `#FFC832` | Industrial / chemistry |
+| `technical` | Cream `#FFDCB9` | Teal `#2DBECD` | Engineering / IT |
+| `electronics` | Violet `#503291` | Yellow `#FFC832` | EMD Electronics (photo cover) |
+
+**Key color constants**
+
+| Role | Name | Hex |
+|---|---|---|
+| Primary brand / headings | MERCK_PURPLE | `#503291` |
+| Highlight / warm emphasis | MERCK_GOLD (Pink) | `#EB3C96` |
+| Primary body text | INK_DARK | `#1A1626` |
+| Secondary text / sources | INK_GRAY | `#555D6E` |
+| Good / positive | GOOD_GREEN | `#149B5F` |
+| Warning / amber | MERCK_YELLOW | `#FFC832` |
+| Bad / negative | BAD_RED | `#E61E50` |
+
+**Typography** — the pipeline applies all fonts automatically:
+- Action title: Verdana Regular 22 pt, Rich Purple
+- Slide heading: Verdana Bold 22 pt, Rich Purple
+- Body text: Verdana Regular (sized to layout density)
+- Source lines: Verdana Regular 8 pt, INK_GRAY
+- Footer: Verdana Regular 8 pt, Rich Purple
+
+---
+
 ## Installation and setup
 
 See [SETUP.md](SETUP.md).
+
+---
+
+## Origin
+
+This pipeline is the code implementation of the **Merck Slide Agent** MyGPT by **Anoop Kumar (LS-CL-CD)**:
+[mygpt-suite.uptimize.merckgroup.com — Merck Slide Agent](https://mygpt-suite.uptimize.merckgroup.com/chat?a=7cdc5dfe-47a8-4009-ac3f-4f95f6a3114e)
+
+The MyGPT agent runs interactively in the Merck internal environment and produces slide plans through a guided conversation. This repository takes that agent's structural discipline: layout catalog, quality rules, brand enforcement, and plan schema — and turns it into a standalone Python pipeline that any tool or script can call programmatically.
