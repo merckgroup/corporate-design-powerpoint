@@ -1,4 +1,4 @@
-# Setup
+# Merck Corporate Design PPTX Tool — Setup
 
 ## Prerequisites
 

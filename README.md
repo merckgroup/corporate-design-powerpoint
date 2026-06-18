@@ -1,4 +1,4 @@
-# Merck PPTX Pipeline
+# Merck Corporate Design PPTX Tool
 
 Convert a markdown brief, an existing PowerPoint, or a structured slide plan into a polished **Merck Healthcare KGaA-branded deck** — without opening PowerPoint.
 
