@@ -51,6 +51,13 @@ _TEMPLATES = {
     "canada": _PKG_DIR / "templates" / "USA_Merck_Themed_Base_v1.pptx",
 }
 _TEMPLATE_DEFAULT = _PKG_DIR / "templates" / "EU_Merck_Themed.pptx"
+_TEMPLATE_DIR     = _PKG_DIR / "templates"
+
+# Permitted image file extensions — prevents a crafted plan from embedding
+# arbitrary files (e.g. databases, documents) by disguising them as images.
+_SAFE_IMAGE_EXTENSIONS = frozenset({
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".tif", ".webp", ".emf", ".wmf",
+})
 
 
 class BuildError(RuntimeError):
@@ -58,8 +65,9 @@ class BuildError(RuntimeError):
 
 
 # Layouts that carry no section-number circle.
+# Must stay in sync with _STRUCTURAL_LAYOUTS in validate_plan.py.
 _NO_CIRCLE_LAYOUTS = {
-    "cover", "agenda", "section_divider", "close", "exec_summary", "hero_stat"
+    "cover", "agenda", "section_divider", "close", "exec_summary", "hero_stat", "pull_quote"
 }
 
 
@@ -80,9 +88,22 @@ def _short_title(text, max_chars: int = 40) -> str:
 
 def _place_image(slide, img_spec: dict) -> None:
     from pptx.util import Inches as _In
-    path = img_spec.get("path")
-    if not path:
+    raw_path = img_spec.get("path")
+    if not raw_path:
         return
+
+    # Security: validate the path is an actual image file before embedding.
+    # Prevents a crafted plan (e.g. via prompt injection) from embedding
+    # arbitrary local files by setting image.path to a non-image path.
+    img_path = pathlib.Path(raw_path)
+    if img_path.suffix.lower() not in _SAFE_IMAGE_EXTENSIONS:
+        print(
+            f"WARNING: image not placed — '{img_path.name}' is not a recognised image type. "
+            f"Allowed: {sorted(_SAFE_IMAGE_EXTENSIONS)}",
+            file=sys.stderr,
+        )
+        return
+
     placement = (img_spec.get("placement") or "right_panel").lower()
     presets = {
         "hero":        (6.83, 1.30, 6.00, 5.00),
@@ -93,7 +114,7 @@ def _place_image(slide, img_spec: dict) -> None:
     w = img_spec.get("w") or w
     h = img_spec.get("h") or h
     try:
-        add_image(slide, path, _In(x), _In(y),
+        add_image(slide, str(img_path), _In(x), _In(y),
                   w=_In(w) if w else None, h=_In(h) if h else None)
     except Exception as exc:
         print(f"WARNING: image not placed: {exc}", file=sys.stderr)
@@ -908,6 +929,14 @@ def build_from_plan(plan, output_path, base_pptx: Optional[str] = None,
         with open(plan, encoding="utf-8") as f:
             plan = json.load(f)
 
+    # Security: validate output path ends with .pptx — sanity guard against
+    # accidental overwrites of non-pptx files (e.g. output_path typo).
+    output_path = pathlib.Path(output_path)
+    if output_path.suffix.lower() != ".pptx":
+        raise ValueError(
+            f"output_path must end with .pptx, got: '{output_path.suffix}'"
+        )
+
     # Auto-fill agenda chapters before validation sees the plan.
     _autofill_agenda(plan)
 
@@ -931,7 +960,17 @@ def build_from_plan(plan, output_path, base_pptx: Optional[str] = None,
         region = str(meta.get("region", "eu")).lower().strip()
         template_path = _TEMPLATES.get(region, _TEMPLATE_DEFAULT)
     else:
-        template_path = pathlib.Path(base_pptx)
+        # Security: restrict base_pptx to the package templates directory so
+        # a caller cannot force-load an arbitrary or maliciously crafted .pptx.
+        bp = pathlib.Path(base_pptx).resolve()
+        if not bp.is_file() or bp.suffix.lower() != ".pptx":
+            raise ValueError(f"base_pptx must be an existing .pptx file: {bp}")
+        if not str(bp).startswith(str(_TEMPLATE_DIR.resolve())):
+            raise ValueError(
+                f"base_pptx must be inside the package templates directory "
+                f"({_TEMPLATE_DIR}). Got: {bp}"
+            )
+        template_path = bp
 
     prs = open_deck(str(template_path))
     ordered = main_slides + appendix_slides
@@ -977,7 +1016,6 @@ def build_from_plan(plan, output_path, base_pptx: Optional[str] = None,
 
     _wire_agenda_hyperlinks(prs, ordered)
 
-    output_path = pathlib.Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     save_deck(prs, str(output_path))
     return str(output_path.resolve())

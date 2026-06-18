@@ -87,6 +87,32 @@ def _ask_meta() -> dict:
     }
 
 
+_VALID_META_REGIONS          = {"EU", "USA"}
+_VALID_META_CLASSIFICATIONS  = {"Public", "Internal", "Confidential"}
+_FORBIDDEN_META_CLASSIFICATIONS = {"Secret", "Top Secret", "TS/SCI"}
+
+
+def _validate_meta_dict(meta: dict) -> None:
+    """Validate a meta dict loaded from --meta file. Raises ValueError on bad values."""
+    region = str(meta.get("region", "")).strip().upper()
+    if region and region not in _VALID_META_REGIONS:
+        raise ValueError(
+            f"meta.region must be EU or USA, got: {region!r}"
+        )
+    raw_cls = str(meta.get("classification", "")).strip()
+    cls_title = raw_cls.title()
+    if cls_title in _FORBIDDEN_META_CLASSIFICATIONS:
+        print(
+            f"ERROR: Classification '{raw_cls}' is not permitted. Exiting.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if raw_cls and cls_title not in _VALID_META_CLASSIFICATIONS:
+        raise ValueError(
+            f"meta.classification must be Public, Internal, or Confidential, got: {raw_cls!r}"
+        )
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="python -m merck_pptx",
@@ -124,6 +150,9 @@ def main():
         if args.meta:
             with open(args.meta, encoding="utf-8") as f:
                 meta = json.load(f)
+            # Security: validate meta fields on load so a malicious or
+            # misconfigured meta.json cannot bypass classification guards.
+            _validate_meta_dict(meta)
         else:
             meta = _ask_meta()
             print()

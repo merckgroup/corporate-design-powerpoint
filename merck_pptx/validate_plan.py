@@ -2,7 +2,7 @@ import re
 
 _STRUCTURAL_FUNCTIONS = frozenset({
     "Cover", "Agenda", "Section Divider", "Close",
-    "Hero Stat", "Pull Quote",
+    "Executive Summary", "Hero Stat", "Pull Quote",
 })
 
 # Lowercase-normalized version for case-insensitive matching of LLM-generated page_functions.
@@ -10,8 +10,9 @@ _STRUCTURAL_FUNCTIONS = frozenset({
 _STRUCTURAL_NORMS = frozenset(fn.lower() for fn in _STRUCTURAL_FUNCTIONS)
 
 # Layouts that are structurally non-content regardless of page_function value.
+# Must stay in sync with _NO_CIRCLE_LAYOUTS in build_from_plan.py.
 _STRUCTURAL_LAYOUTS = frozenset({
-    "cover", "agenda", "section_divider", "close", "hero_stat", "pull_quote",
+    "cover", "agenda", "section_divider", "close", "exec_summary", "hero_stat", "pull_quote",
 })
 
 _VALID_LAYOUTS = frozenset({
@@ -42,6 +43,11 @@ _COUNT_WORDS = {
     "six": 6, "seven": 7, "eight": 8,
 }
 
+_FORBIDDEN_CLASSIFICATIONS = frozenset({"secret", "top secret", "ts/sci"})
+_VALID_CLASSIFICATIONS = frozenset({"public", "internal", "confidential"})
+
+MAX_SLIDES = 150
+
 
 class ValidationError(ValueError):
     pass
@@ -55,7 +61,28 @@ def validate_plan(plan: dict) -> list:
     for soft violations (caller is responsible for printing them).
     """
     warnings = []
+    meta = plan.get("meta") or {}
     slides = plan.get("slides", [])
+
+    # Hard: forbidden classification — enforced here so the Python API and
+    # the build command cannot bypass the Secret guard that the CLI prompts use.
+    classification = str(meta.get("classification", "")).strip().lower()
+    if classification in _FORBIDDEN_CLASSIFICATIONS:
+        raise ValidationError(
+            f"Classification '{meta.get('classification')}' is not permitted. "
+            f"This pipeline cannot process Secret-classified content."
+        )
+    if classification and classification not in _VALID_CLASSIFICATIONS:
+        raise ValidationError(
+            f"Unknown classification '{meta.get('classification')}'. "
+            f"Must be Public, Internal, or Confidential."
+        )
+
+    # Hard: slide count cap — prevents memory exhaustion from crafted plans.
+    if len(slides) > MAX_SLIDES:
+        raise ValidationError(
+            f"Plan contains {len(slides)} slides; maximum permitted is {MAX_SLIDES}."
+        )
 
     seen_nums = set()
     agenda_chapters = 0

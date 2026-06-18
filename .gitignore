@@ -32,6 +32,16 @@ CLAUDE.md
 .env
 *.env
 
+# Certificates, keys, and credential files
+*.pem
+*.key
+*.p12
+*.pfx
+*.token
+credentials.json
+secrets.json
+secrets.yaml
+
 # OS
 .DS_Store
 Thumbs.db
