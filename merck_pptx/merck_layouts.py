@@ -1212,60 +1212,30 @@ def _top_chrome(slide, meta, category, palette, top_bar=False,
 
 
 def _bottom_chrome(slide, meta, category, page, total, palette):
-    """Footer: populate template master placeholders (ftr + sldNum).
+    """Footer text boxes: deck label + category (left) and page number (right).
 
-    No band or hardcoded colors are drawn. Text content is injected into the
-    slide's native <p:ph type="ftr"> and <p:ph type="sldNum"> placeholder
-    shapes so that font, color, and position are governed by the slide master.
+    No band is drawn. Colors follow the template: INK_GRAY for the left text,
+    MERCK_GOLD for the page number. Custom text boxes are used (not native
+    placeholder injection) because the content is per-slide dynamic.
     """
-    from lxml import etree
-    from xml.sax.saxutils import escape as _xml_escape
-
     meta = meta or {}
+
     deck_label = meta.get("deck_label", "")
     cat = category or ""
-    parts = [p for p in [deck_label, cat] if p]
-    footer_text = _xml_escape("   •   ".join(parts))
+    left_parts = [p for p in [deck_label, cat] if p]
+    if left_parts:
+        txt(slide, Inches(0.65), FOOTER_TEXT_Y, Inches(10.0), Inches(0.20),
+            "   •   ".join(left_parts), sz=9,
+            color=INK_GRAY, bold=False,
+            font=FONT_BODY, anchor=MSO_ANCHOR.TOP)
 
-    page_text = ""
     if page is not None:
-        page_text = _xml_escape(_pad_int(page))
+        page_text = _pad_int(page)
         if total:
-            page_text = _xml_escape(f"{_pad_int(page)} / {_pad_int(total)}")
-
-    spTree = slide.shapes._spTree
-    _NS = (
-        'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" '
-        'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"'
-    )
-
-    if footer_text:
-        spTree.append(etree.fromstring(
-            f'<p:sp {_NS}>'
-            '<p:nvSpPr>'
-            '<p:cNvPr id="901" name="Footer"/>'
-            '<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>'
-            '<p:nvPr><p:ph type="ftr"/></p:nvPr>'
-            '</p:nvSpPr>'
-            '<p:spPr/>'
-            '<p:txBody><a:bodyPr/><a:lstStyle/>'
-            f'<a:p><a:r><a:t>{footer_text}</a:t></a:r></a:p>'
-            '</p:txBody></p:sp>'
-        ))
-
-    if page_text:
-        spTree.append(etree.fromstring(
-            f'<p:sp {_NS}>'
-            '<p:nvSpPr>'
-            '<p:cNvPr id="902" name="SlideNumber"/>'
-            '<p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr>'
-            '<p:nvPr><p:ph type="sldNum" sz="quarter"/></p:nvPr>'
-            '</p:nvSpPr>'
-            '<p:spPr/>'
-            '<p:txBody><a:bodyPr/><a:lstStyle/>'
-            f'<a:p><a:r><a:t>{page_text}</a:t></a:r></a:p>'
-            '</p:txBody></p:sp>'
-        ))
+            page_text = f"{_pad_int(page)} / {_pad_int(total)}"
+        txt(slide, Inches(12.0), FOOTER_TEXT_Y, Inches(1.0), Inches(0.20),
+            page_text, sz=9, color=MERCK_GOLD,
+            bold=True, font=FONT_BODY, align=PP_ALIGN.RIGHT)
 
 
 _ICON_DISPATCH = {
