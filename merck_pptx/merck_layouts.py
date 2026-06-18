@@ -2324,39 +2324,73 @@ def add_small_multiples(slide, x, y, w, h, datasets, palette, grid=(2, 3)):
                 font=FONT_BODY, align=PP_ALIGN.RIGHT)
 
 
-def add_simple_bar(slide, x, y, w, h, items, palette, horizontal=False,
-                   highlight_index=None):
-    """Simple bar / column chart as a NATIVE PowerPoint chart.
+def add_simple_bar(slide, x, y, w, h, items=None, palette=None,
+                   horizontal=False, highlight_index=None,
+                   series=None, categories=None, chart_type_name="column"):
+    """Simple bar / column / line chart as a NATIVE PowerPoint chart.
 
-    Users can right-click → Edit Data in PowerPoint to update the numbers
-    live. Bars are colored from the Merck palette via per-data-point fill
-    overrides. When highlight_index is set, that bar renders in MERCK_GOLD
-    and the others in PURPLE_MUTED for emphasis.
+    Accepts two data formats:
+      Legacy format  — items: list of [label, value] pairs (single series).
+      Standard format — categories: list of str  +  series: list of
+                        {name: str, values: list of float}.
 
-    items: list of [label, value] pairs (the schema's bar data shape).
+    chart_type_name: "column" | "bar" | "line"  (ignored for legacy callers
+    that set horizontal=True, which stays as BAR_CLUSTERED).
     """
-    if not items:
+    _CHART_TYPES = {
+        "column": XL_CHART_TYPE.COLUMN_CLUSTERED,
+        "bar":    XL_CHART_TYPE.BAR_CLUSTERED,
+        "line":   XL_CHART_TYPE.LINE,
+    }
+
+    # ------------------------------------------------------------------
+    # Normalise to (cats, series_list) regardless of which format arrived.
+    # ------------------------------------------------------------------
+    if series is not None and categories is not None:
+        # Standard {categories, series} format.
+        cats        = [str(c) for c in categories]
+        series_list = list(series)
+    elif items:
+        # Legacy [label, value] pairs → single series named "Value".
+        cats        = [str(it[0]) for it in items]
+        series_list = [{"name": "Value", "values": [float(it[1]) for it in items]}]
+    else:
         return None
 
-    # Build the chart data.
-    cats = [str(it[0]) for it in items]
-    vals = [float(it[1]) for it in items]
+    if not cats or not series_list:
+        return None
+
     chart_data = CategoryChartData()
     chart_data.categories = cats
-    chart_data.add_series("Value", vals)
+    for s in series_list:
+        vals = [float(v) for v in s.get("values", [])]
+        chart_data.add_series(str(s.get("name", "")), vals)
 
-    chart_type = (XL_CHART_TYPE.BAR_CLUSTERED if horizontal
-                  else XL_CHART_TYPE.COLUMN_CLUSTERED)
+    # ------------------------------------------------------------------
+    # Determine PowerPoint chart type.
+    # ------------------------------------------------------------------
+    if horizontal:
+        xl_type = XL_CHART_TYPE.BAR_CLUSTERED
+    else:
+        xl_type = _CHART_TYPES.get(str(chart_type_name).lower(),
+                                   XL_CHART_TYPE.COLUMN_CLUSTERED)
+
     chart_shape = slide.shapes.add_chart(
-        chart_type, _emu(x), _emu(y), _emu(w), _emu(h), chart_data
+        xl_type, _emu(x), _emu(y), _emu(w), _emu(h), chart_data
     )
     chart = chart_shape.chart
 
-    # Clean styling — no legend, no title, light gridlines only.
-    chart.has_legend = False
+    # Clean styling — no legend when single series; show for multi-series.
     chart.has_title = False
+    chart.has_legend = len(series_list) > 1
+    if chart.has_legend:
+        try:
+            chart.legend.position    = 2  # BOTTOM
+            chart.legend.include_in_layout = False
+        except Exception:
+            pass
+
     try:
-        # Hide vertical gridlines on column charts; keep light horizontal.
         for axis in (chart.category_axis, chart.value_axis):
             try:
                 axis.tick_labels.font.size = Pt(10)
@@ -2366,39 +2400,55 @@ def add_simple_bar(slide, x, y, w, h, items, palette, horizontal=False,
     except Exception:
         pass
 
-    # Color: highlight one point in MERCK_GOLD vs PURPLE_MUTED, or all bars
-    # in MERCK_PURPLE when no highlight specified.
-    series = chart.series[0]
-    if highlight_index is not None:
-        for i, pt in enumerate(series.points):
-            fill = pt.format.fill
-            fill.solid()
-            fill.fore_color.rgb = _rgb_tuple(
-                MERCK_GOLD if i == int(highlight_index) else PURPLE_MUTED
-            )
-    else:
-        for i, pt in enumerate(series.points):
-            fill = pt.format.fill
-            fill.solid()
-            fill.fore_color.rgb = _rgb_tuple(MERCK_PURPLE)
-
-    # Show data labels on top of each bar.
-    try:
-        from pptx.enum.chart import XL_LABEL_POSITION
-        plot = chart.plots[0]
-        plot.has_data_labels = True
-        dl = plot.data_labels
-        dl.show_value = True
-        dl.font.size = Pt(9)
-        dl.font.bold = True
-        dl.font.color.rgb = _rgb_tuple(INK_DARK)
+    # ------------------------------------------------------------------
+    # Color each series.  For a single series use the highlight logic;
+    # for multiple series rotate through the Merck palette.
+    # ------------------------------------------------------------------
+    _MULTI_SERIES_COLORS = [
+        MERCK_PURPLE, MERCK_GOLD, MERCK_BLUE, GOOD_GREEN,
+        BAD_RED, MERCK_AQUA, PURPLE_MUTED, MERCK_YELLOW,
+    ]
+    for si, s_obj in enumerate(chart.series):
+        series_color = _MULTI_SERIES_COLORS[si % len(_MULTI_SERIES_COLORS)]
         try:
-            dl.position = (XL_LABEL_POSITION.OUTSIDE_END if not horizontal
-                           else XL_LABEL_POSITION.OUTSIDE_END)
+            s_obj.format.line.color.rgb = _rgb_tuple(series_color)
+            s_obj.format.fill.solid()
+            s_obj.format.fill.fore_color.rgb = _rgb_tuple(series_color)
         except Exception:
             pass
-    except Exception:
-        pass
+        if si == 0 and highlight_index is not None:
+            for i, pt in enumerate(s_obj.points):
+                fill = pt.format.fill
+                fill.solid()
+                fill.fore_color.rgb = _rgb_tuple(
+                    MERCK_GOLD if i == int(highlight_index) else PURPLE_MUTED
+                )
+        elif si == 0 and len(series_list) == 1:
+            for pt in s_obj.points:
+                fill = pt.format.fill
+                fill.solid()
+                fill.fore_color.rgb = _rgb_tuple(MERCK_PURPLE)
+
+    # Data labels — only on bar/column charts (not line).
+    if xl_type not in (XL_CHART_TYPE.LINE,):
+        try:
+            from pptx.enum.chart import XL_LABEL_POSITION
+            plot = chart.plots[0]
+            plot.has_data_labels = True
+            dl = plot.data_labels
+            dl.show_value = True
+            dl.font.size = Pt(9)
+            dl.font.bold = True
+            try:
+                dl.font.color.rgb = _rgb_tuple(INK_DARK)
+            except Exception:
+                pass
+            try:
+                dl.position = XL_LABEL_POSITION.OUTSIDE_END
+            except Exception:
+                pass
+        except Exception:
+            pass
 
     return chart_shape
 
@@ -2408,8 +2458,9 @@ def add_simple_bar(slide, x, y, w, h, items, palette, horizontal=False,
 def _render_chart(slide, chart, x, y, w, h, palette):
     if not chart:
         return
-    ctype = chart.get("type", "bar")
+    ctype = chart.get("type", "column")
     data = chart.get("data", {})
+
     if ctype == "slope":
         add_slope_chart(slide, x, y, w, h,
                         data.get("before_label", "Before"),
@@ -2429,11 +2480,44 @@ def _render_chart(slide, chart, x, y, w, h, palette):
         add_small_multiples(slide, x, y, w, h,
                             data.get("datasets", []), palette,
                             grid=tuple(data.get("grid", (2, 3))))
+    elif ctype in ("bar", "column", "line"):
+        # Standard {categories, series} format — preferred for LLM-generated plans.
+        # Falls back to legacy [label, value] items format when series is absent.
+        series_data  = data.get("series")
+        categories   = data.get("categories")
+        legacy_items = data.get("items")
+        if series_data and categories:
+            add_simple_bar(slide, x, y, w, h,
+                           categories=categories,
+                           series=series_data,
+                           palette=palette,
+                           horizontal=(ctype == "bar"),
+                           highlight_index=data.get("highlight_index"),
+                           chart_type_name=ctype)
+        elif legacy_items:
+            add_simple_bar(slide, x, y, w, h,
+                           items=legacy_items,
+                           palette=palette,
+                           horizontal=(ctype == "bar"),
+                           highlight_index=data.get("highlight_index"),
+                           chart_type_name=ctype)
+        else:
+            import sys
+            print(f"WARNING: chart_slide received type='{ctype}' but no "
+                  f"'series'+'categories' or 'items' data found — slide "
+                  f"will render without a chart.", file=sys.stderr)
     else:
-        add_simple_bar(slide, x, y, w, h,
-                       data.get("items", []), palette,
-                       horizontal=bool(data.get("horizontal", False)),
-                       highlight_index=data.get("highlight_index"))
+        # Unknown type: attempt legacy items format and warn.
+        import sys
+        items = data.get("items", [])
+        if items:
+            add_simple_bar(slide, x, y, w, h,
+                           items=items, palette=palette,
+                           horizontal=bool(data.get("horizontal", False)),
+                           highlight_index=data.get("highlight_index"))
+        else:
+            print(f"WARNING: chart_slide received unknown chart type "
+                  f"'{ctype}' with no renderable data.", file=sys.stderr)
 
 
 # ===========================================================================
@@ -2600,7 +2684,26 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
             title_text = "".join(seg[0] for seg in title)
         else:
             title_text = str(title) if title else ""
-        _populate_placeholder(0, slide, title_text)
+
+        # Split title at the schema-convention ';' separator: everything before
+        # the first ';' is the deck title; everything after is the subtitle.
+        # This prevents long combined strings from overflowing the title box.
+        title_part, _, subtitle_part = title_text.partition(";")
+        title_part    = title_part.strip()
+        subtitle_part = subtitle_part.strip()
+
+        ph_title = _populate_placeholder(0, slide, title_part)
+        if ph_title is not None and ph_title.has_text_frame:
+            try:
+                from pptx.enum.text import MSO_AUTO_SIZE
+                ph_title.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+            except Exception:
+                pass
+
+        # Populate subtitle placeholder (idx 1) with subtitle_part if the
+        # slide had no explicit subtitle and the title contained a ';' split.
+        if subtitle_part and not subtitle:
+            subtitle = subtitle_part
         if subtitle:
             _populate_placeholder(1, slide, subtitle)
         # Name/Date placeholder (idx 10): two lines (author name; month/year).
@@ -3167,8 +3270,8 @@ def _two_or_three_column_card(slide, x, y, w, h, col, palette):
     dot_y   = y + (HDR_H - DOT_SZ) / 2
     circle(slide, dot_x, dot_y, DOT_SZ, fill=dot_col)
 
-    # Label text on bar
-    label = col.get("label", "")
+    # Label text on bar — accept "label" (internal name) or "header" (schema name).
+    label = col.get("label") or col.get("header", "")
     if label:
         txt(slide, dot_x + DOT_SZ + Inches(0.10), y,
             w - DOT_SZ - Inches(0.40), HDR_H,
@@ -4267,8 +4370,9 @@ def build_milestone_timeline(prs, meta, action_title=None, milestones=None, take
             sz=10, color=MERCK_GOLD, bold=True, font=FONT_BODY,
             align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
 
-        # Title.
-        title_color = MERCK_GOLD if st == "current" else MERCK_PURPLE
+        # Title — use white on dark-background styles so text is readable.
+        dark = _is_dark(style)
+        title_color = MERCK_GOLD if st == "current" else (WHITE if dark else MERCK_PURPLE)
         txt(slide, zone_x + col_w * i, title_y, col_w, Inches(0.40),
             str(m.get("title", "")), sz=13, color=title_color, bold=True,
             font=FONT_BODY, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
@@ -5247,25 +5351,31 @@ def build_pull_quote(prs, meta, quote=None, attribution=None,
     attr_color = PANEL_LIGHT  if dark else INK_GRAY
     ctx_color  = PANEL_LIGHT  if dark else PURPLE_MUTED
 
-    txt(slide, Inches(0.55), Inches(1.55), Inches(1.20), Inches(1.40),
-        "“", sz=96, color=MERCK_GOLD, bold=True,
+    # Shift quote content below the action-title chrome.  A single-line title
+    # clears at ~1.50; a two-line title can reach ~1.95.  Use the subtitle-
+    # aware offset so content never overlaps the action title text.
+    q_top = Inches(2.10) if not subtitle else Inches(2.50)
+
+    txt(slide, Inches(0.55), q_top, Inches(1.20), Inches(1.40),
+        "\u201c", sz=96, color=MERCK_GOLD, bold=True,
         font=FONT_HEAD, align=PP_ALIGN.LEFT)
 
     if context:
-        txt(slide, Inches(1.40), Inches(1.70), Inches(10.5), Inches(0.30),
+        txt(slide, Inches(1.40), q_top + Inches(0.15), Inches(10.5), Inches(0.30),
             str(context).upper(), sz=9, color=ctx_color, bold=True,
             font=FONT_BODY, align=PP_ALIGN.LEFT)
 
-    txt(slide, Inches(1.40), Inches(2.05), Inches(10.5), Inches(2.80),
-        str(quote or ""), sz=32, color=q_color, bold=True, italic=True,
+    txt(slide, Inches(1.40), q_top + Inches(0.50), Inches(10.5), Inches(2.80),
+        str(quote or ''), sz=32, color=q_color, bold=True, italic=True,
         font=FONT_HEAD, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP)
 
-    hairline(slide, Inches(1.40), Inches(5.10), Inches(2.80),
+    attr_y = q_top + Inches(3.55)
+    hairline(slide, Inches(1.40), attr_y, Inches(2.80),
              Emu(int(Pt(2))), MERCK_GOLD)
 
     if attribution:
-        txt(slide, Inches(1.40), Inches(5.24), Inches(10.5), Inches(0.42),
-            f"— {attribution}", sz=13, color=attr_color, italic=True,
+        txt(slide, Inches(1.40), attr_y + Inches(0.14), Inches(10.5), Inches(0.42),
+            f'\u2014 {attribution}', sz=13, color=attr_color, italic=True,
             font=FONT_BODY, align=PP_ALIGN.LEFT)
 
     return slide
@@ -5563,84 +5673,6 @@ def build_icon_grid(prs, meta, action_title=None, items=None,
             card_w - Inches(0.36), card_h - icon_sz - Inches(0.46),
             str(item.get("body", "")),
             sz=10, color=body_col, font=FONT_BODY, anchor=MSO_ANCHOR.TOP)
-
-    return slide
-
-
-# ===========================================================================
-# Layout: JOURNEY MAP (swim-lane)
-# ===========================================================================
-
-def build_journey_map(prs, meta, action_title=None, phases=None,
-                      actors=None, takeaway="", source=None, subtitle=None,
-                      methodology_note=None, style="merck_executive",
-                      page=None, total=None, section_number=None,
-                      category=None):
-    """Horizontal swim-lane journey map.
-
-    phases: list of str — column headers (e.g. ['Discover', 'Evaluate'])
-    actors: list of dicts with keys:
-        name  (str) — row label
-        cells (list of str) — one entry per phase column
-    """
-    pal = _palette_for(style)
-    slide = _new_slide(prs, bg_color=pal["bg"])
-    apply_chrome(slide, meta, action_title, category=category,
-                 takeaway=takeaway, source=source, subtitle=subtitle,
-                 methodology_note=methodology_note,
-                 page=page, total=total, section_number=section_number,
-                 palette=style)
-
-    phases   = list(phases or [])[:6]
-    actors   = list(actors or [])[:5]
-    n_phases = max(len(phases), 1)
-    n_actors = max(len(actors), 1)
-
-    zone_x, zone_y = Inches(0.55), Inches(1.62)
-    zone_w, zone_h = Inches(12.2), Inches(4.72)
-    row_label_w    = Inches(1.30)
-    col_w          = (zone_w - row_label_w) / n_phases
-    header_h       = Inches(0.50)
-    row_h          = (zone_h - header_h) / n_actors
-    gap            = Emu(18000)
-
-    PHASE_COLORS = [MERCK_PURPLE, MERCK_BLUE, MERCK_GOLD,
-                    GOOD_GREEN, PURPLE_MUTED, MERCK_AQUA]
-
-    for j, ph in enumerate(phases):
-        px    = zone_x + row_label_w + j * col_w
-        col_c = PHASE_COLORS[j % len(PHASE_COLORS)]
-        rect(slide, px + gap, zone_y, col_w - gap * 2, header_h, fill=col_c)
-        txt(slide, px + gap, zone_y, col_w - gap * 2, header_h,
-            str(ph).upper(), sz=10, color=WHITE, bold=True,
-            font=FONT_BODY, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
-
-    rect(slide, zone_x, zone_y, row_label_w, header_h, fill=PURPLE_DEEP)
-
-    for i, actor in enumerate(actors):
-        ry     = zone_y + header_h + i * row_h
-        row_bg = PANEL_LIGHT if (i % 2 == 0) else WHITE
-
-        rect(slide, zone_x, ry + gap, row_label_w, row_h - gap * 2,
-             fill=MERCK_PURPLE)
-        txt(slide, zone_x, ry + gap, row_label_w, row_h - gap * 2,
-            str(actor.get("name", "")),
-            sz=10, color=WHITE, bold=True, font=FONT_BODY,
-            align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
-
-        cells = list(actor.get("cells", []))
-        for j in range(n_phases):
-            px = zone_x + row_label_w + j * col_w
-            rect(slide, px + gap, ry + gap,
-                 col_w - gap * 2, row_h - gap * 2,
-                 fill=row_bg, border=LIGHT_GRAY, border_w=Pt(0.25))
-            cell_text = cells[j] if j < len(cells) else ""
-            txt(slide,
-                px + gap + Inches(0.10), ry + gap + Inches(0.08),
-                col_w - gap * 2 - Inches(0.20),
-                row_h - gap * 2 - Inches(0.12),
-                str(cell_text),
-                sz=9, color=INK_DARK, font=FONT_BODY, anchor=MSO_ANCHOR.TOP)
 
     return slide
 
@@ -6229,11 +6261,14 @@ def build_risk_heatmap(prs, meta, action_title=None, risks=None,
     risks = list(risks or [])[:15]
     dark  = _is_dark(style)
 
+    # grid_y must clear the action title chrome (single-line ~1.50, two-line
+    # can reach ~1.90).  Use the same subtitle-aware offset other layouts use.
     GRID_N  = 5
     grid_x  = Inches(1.60)
-    grid_y  = Inches(1.78)
+    grid_y  = Inches(2.55) if not subtitle else Inches(2.95)
     grid_w  = Inches(6.20)
-    grid_h  = Inches(4.40)
+    # Bottom boundary: leave room for takeaway bar (~0.55) + source (~0.35).
+    grid_h  = Inches(6.50) - grid_y - Inches(0.90)
     cell_w  = grid_w / GRID_N
     cell_h  = grid_h / GRID_N
 
@@ -6407,9 +6442,11 @@ def build_pros_cons(prs, meta, action_title=None, pros=None, cons=None,
 
     pros = list(pros or [])
     cons = list(cons or [])
-    zone_x, zone_y = Inches(0.55), Inches(1.62)
-    zone_w, zone_h = Inches(12.2), Inches(4.72)
-    gap = Inches(0.14)
+    zone_x = Inches(0.55)
+    zone_y = Inches(2.10) if not subtitle else Inches(2.55)
+    zone_w = Inches(12.2)
+    zone_h = Inches(6.50) - zone_y - Inches(1.10)   # respect takeaway/source at bottom
+    gap    = Inches(0.14)
 
     if subject:
         subj_h = Inches(0.46)

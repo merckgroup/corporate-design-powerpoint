@@ -380,11 +380,50 @@ def _build_vertical_numbered(prs, meta, slide, total):
     )
 
 
+def _normalise_waterfall_bars(bars: list) -> list:
+    """Translate plan-schema bar types to the layout function's internal types.
+
+    Plan schema uses:  "total" | "positive" | "negative"
+    Layout function expects: "start" | "end" | "up" | "down"
+
+    Rules:
+    - "total"    → "start" for the first bar in a run of totals,
+                   "end" for the last; all others in the middle become "end"
+                   (the function treats "end" and "start" identically in terms
+                   of running-total logic, both anchor to zero).
+    - "positive" → "up"   (value kept as-is, must be > 0)
+    - "negative" → "down" (value stored as positive; add_waterfall uses abs())
+
+    Unknown types are left unchanged so hand-crafted plans using the internal
+    type names ("up", "down", "start", "end") continue to work.
+    """
+    _ALIAS = {"positive": "up", "negative": "down", "total": "end"}
+    normalised = []
+    for i, b in enumerate(bars):
+        b = dict(b)
+        t = str(b.get("type", "up")).lower()
+        if t == "total":
+            # First bar anchors the baseline; subsequent totals close the chart.
+            b["type"] = "start" if i == 0 else "end"
+        elif t == "negative":
+            b["type"] = "down"
+            # Value must be positive; layout function uses abs() for "down" bars.
+            try:
+                b["value"] = abs(float(b.get("value", 0)))
+            except (TypeError, ValueError):
+                pass
+        elif t in _ALIAS:
+            b["type"] = _ALIAS[t]
+        normalised.append(b)
+    return normalised
+
+
 def _build_waterfall_slide(prs, meta, slide, total):
     c = _content(slide)
     chart = c.get("chart") or {}
     # Schema: content.chart.data.bars — extract bars for the layout function.
     bars = chart.get("data", {}).get("bars") or chart.get("bars") or []
+    bars = _normalise_waterfall_bars(bars)
     return build_waterfall_slide(
         prs, meta,
         action_title=slide.get("action_title", ""),
@@ -398,12 +437,36 @@ def _build_waterfall_slide(prs, meta, slide, total):
     )
 
 
+def _normalise_decision(d: dict) -> dict:
+    """Translate plan-schema decision dict to the layout function's expected keys.
+
+    Plan schema:  {tone, number, owner, text}
+    Layout reads: {tone, number, owner, title (opt), desc/body/description}
+
+    When only "text" is present (single-string body, no title/desc split),
+    map it to "body" so the layout renders it in the body area.  Explicit
+    "title" or "desc"/"body"/"description" keys are left untouched so plans
+    that already use the internal naming continue to work.
+    """
+    d = dict(d)
+    has_title = bool(d.get("title") or d.get("decision"))
+    has_body  = bool(d.get("desc") or d.get("body") or d.get("description"))
+    if not has_title and not has_body:
+        raw = d.pop("text", None)
+        if raw is not None:
+            d["body"] = raw
+    elif not has_body and not has_title:
+        pass  # nothing to map
+    return d
+
+
 def _build_decision_rows(prs, meta, slide, total):
     c = _content(slide)
+    decisions = [_normalise_decision(d) for d in c.get("decisions", [])]
     return build_decision_rows(
         prs, meta,
         action_title=slide.get("action_title", ""),
-        decisions=c.get("decisions", []),
+        decisions=decisions,
         takeaway=slide.get("takeaway", ""),
         source=slide.get("source"),
         subtitle=slide.get("subtitle"),
@@ -469,27 +532,73 @@ def _build_stat_strip(prs, meta, slide, total):
 
 def _build_before_after(prs, meta, slide, total):
     c = _content(slide)
+    before = c.get("before") or {}
+    after  = c.get("after")  or {}
+    # Labels can live at content level (before_label / after_label) OR nested
+    # inside the before/after dicts as "label".  Content-level takes precedence
+    # so that plans which explicitly set before_label continue to work.
+    before_label = (c.get("before_label")
+                    or (before.get("label") if isinstance(before, dict) else None)
+                    or "TODAY")
+    after_label  = (c.get("after_label")
+                    or (after.get("label") if isinstance(after, dict) else None)
+                    or "TOMORROW")
     return build_before_after(
         prs, meta,
         action_title=slide.get("action_title", ""),
-        before=c.get("before", {}),
-        after=c.get("after", {}),
+        before=before,
+        after=after,
         takeaway=slide.get("takeaway", ""),
         source=slide.get("source"),
         subtitle=slide.get("subtitle"),
-        before_label=c.get("before_label", "TODAY"),
-        after_label=c.get("after_label", "TOMORROW"),
+        before_label=before_label,
+        after_label=after_label,
         methodology_note=c.get("methodology_note"),
         **_common_kwargs(slide, meta, total),
     )
+
+
+_MILESTONE_STATUS_ALIASES = {
+    "upcoming": "future",
+    "future":   "future",
+    "pending":  "future",
+    "planned":  "future",
+    "completed": "done",
+    "complete":  "done",
+    "done":      "done",
+    "finished":  "done",
+    "active":    "current",
+    "current":   "current",
+    "in_progress": "current",
+    "inprogress":  "current",
+}
+
+
+def _normalise_milestone(m: dict) -> dict:
+    """Translate plan-schema milestone dict to the layout function's expected keys.
+
+    Plan schema:  {date, label, description, status}
+    Layout reads: {date, title,  body,        status ("done"|"current"|"future")}
+    """
+    m = dict(m)
+    # Key aliases: label → title, description → body
+    if "title" not in m and "label" in m:
+        m["title"] = m.pop("label")
+    if "body" not in m and "description" in m:
+        m["body"] = m.pop("description")
+    # Status normalisation
+    raw_status = str(m.get("status", "future")).lower().replace(" ", "_")
+    m["status"] = _MILESTONE_STATUS_ALIASES.get(raw_status, "future")
+    return m
 
 
 def _build_milestone_timeline(prs, meta, slide, total):
     c = _content(slide)
+    milestones = [_normalise_milestone(m) for m in c.get("milestones", [])]
     return build_milestone_timeline(
         prs, meta,
         action_title=slide.get("action_title", ""),
-        milestones=c.get("milestones", []),
+        milestones=milestones,
         takeaway=slide.get("takeaway", ""),
         source=slide.get("source"),
         subtitle=slide.get("subtitle"),
@@ -498,13 +607,37 @@ def _build_milestone_timeline(prs, meta, slide, total):
     )
 
 
+_STATUS_TABLE_COL_ORDER = [
+    "program", "phase", "status", "rag", "health",
+    "milestone", "owner", "due", "date", "comment", "notes",
+]
+
+
+def _derive_status_columns(rows: list) -> list:
+    """Derive column headers from the first row's keys when columns are absent.
+
+    Key ordering follows _STATUS_TABLE_COL_ORDER so common fields (program,
+    phase, status …) always appear in a sensible sequence.  Unknown keys are
+    appended alphabetically after the known ones.
+    """
+    if not rows:
+        return []
+    first = rows[0] if isinstance(rows[0], dict) else {}
+    keys = list(first.keys())
+    ordered = [k for k in _STATUS_TABLE_COL_ORDER if k in keys]
+    remainder = sorted(k for k in keys if k not in ordered)
+    return [k.replace("_", " ").title() for k in (ordered + remainder)]
+
+
 def _build_status_table(prs, meta, slide, total):
     c = _content(slide)
+    rows = c.get("rows", [])
+    columns = c.get("columns") or _derive_status_columns(rows)
     return build_status_table(
         prs, meta,
         action_title=slide.get("action_title", ""),
-        columns=c.get("columns", []),
-        rows=c.get("rows", []),
+        columns=columns,
+        rows=rows,
         takeaway=slide.get("takeaway", ""),
         source=slide.get("source"),
         subtitle=slide.get("subtitle"),
@@ -678,13 +811,56 @@ def _build_icon_grid(prs, meta, slide, total):
     )
 
 
+def _normalise_journey_rows(raw_rows: list) -> tuple:
+    """Normalise journey map rows to the layout function's {label, cells} format.
+
+    Accepted input formats:
+      A) Native layout format: [{label, cells: [str, ...]}]
+      B) Rich step format:     [{actor, steps: [{stage, action, emotion}, ...]}]
+         or                    [{name,  steps: [{stage, action, emotion}, ...]}]
+
+    For Format B, cells are derived from step.action (with stage as fallback).
+    Phase headers are derived from step.stage values of the first row when
+    content.phases is absent.
+
+    Returns (phases, rows) where phases is a list of str column headers and
+    rows is a list of {label, cells} dicts.
+    """
+    phases_derived: list = []
+    normalised: list = []
+    for i, row in enumerate(raw_rows):
+        if not isinstance(row, dict):
+            continue
+        # Determine row label — accept "label", "name", or "actor".
+        label = (row.get("label") or row.get("name") or row.get("actor") or "")
+
+        steps = row.get("steps")
+        cells = row.get("cells")
+
+        if steps is not None:
+            # Rich step format: extract action text from each step.
+            cells = [str(s.get("action") or s.get("stage") or "") for s in steps]
+            if i == 0 and not phases_derived:
+                phases_derived = [str(s.get("stage", "")) for s in steps]
+        elif cells is None:
+            cells = []
+
+        normalised.append({"label": str(label), "cells": [str(c) for c in cells]})
+    return phases_derived, normalised
+
+
 def _build_journey_map(prs, meta, slide, total):
     c = _content(slide)
+    raw_rows = c.get("rows") or c.get("actors") or []
+    phases_from_content = c.get("phases") or []
+    phases_derived, rows = _normalise_journey_rows(raw_rows)
+    # Prefer explicitly declared phases; fall back to those derived from steps.
+    phases = phases_from_content or phases_derived
     return build_journey_map(
         prs, meta,
         action_title=slide.get("action_title", ""),
-        phases=c.get("phases", []),
-        rows=c.get("actors", []),         # schema key: actors; layout key: rows
+        phases=phases,
+        rows=rows,
         takeaway=slide.get("takeaway", ""),
         source=slide.get("source"),
         subtitle=slide.get("subtitle"),
@@ -704,13 +880,56 @@ def _build_funnel(prs, meta, slide, total):
     )
 
 
+def _normalise_comparison_table(c: dict) -> tuple:
+    """Return (options, features) normalised from whatever format the plan uses.
+
+    Two accepted formats:
+      A) Native layout format (used by LLM when it knows the schema):
+           options:  ["Option A", "Option B", ...]
+           features: [{"label": "Criterion", "values": ["yes", "no", ...], "highlighted": false}, ...]
+
+      B) Simple matrix format (natural LLM/human output):
+           headers: ["Criterion", "Option A", "Option B", ...]   ← first cell is the row-label column
+           rows:    [["Timeline", "Full recovery", "Partial", ...], ...]
+
+    Format B is normalised to Format A.  If both "options" and "headers" are
+    present, "options" wins (backwards compat for plans already using Format A).
+    """
+    options  = c.get("options")
+    features = c.get("features")
+    if options or features:
+        return list(options or []), list(features or [])
+
+    headers = c.get("headers") or []
+    rows    = c.get("rows") or []
+
+    if not headers and not rows:
+        return [], []
+
+    # First header is the row-label column; remaining are option columns.
+    derived_options  = [str(h) for h in headers[1:]] if len(headers) > 1 else []
+    derived_features = []
+    for row in rows:
+        if isinstance(row, (list, tuple)):
+            label  = str(row[0]) if row else ""
+            values = [str(v) for v in row[1:]]
+        elif isinstance(row, dict):
+            label  = str(row.get("label", ""))
+            values = [str(v) for v in row.get("values", [])]
+        else:
+            continue
+        derived_features.append({"label": label, "values": values})
+    return derived_options, derived_features
+
+
 def _build_comparison_table(prs, meta, slide, total):
     c = _content(slide)
+    options, features = _normalise_comparison_table(c)
     return build_comparison_table(
         prs, meta,
         action_title=slide.get("action_title", ""),
-        options=c.get("options", []),    # schema keys: options + features
-        features=c.get("features", []),
+        options=options,
+        features=features,
         **_common_kwargs(slide, meta, total),
     )
 
