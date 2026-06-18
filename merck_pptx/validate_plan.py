@@ -60,7 +60,10 @@ _COUNT_WORDS = {
 }
 
 _FORBIDDEN_CLASSIFICATIONS = frozenset({"secret", "top secret", "ts/sci"})
-_VALID_CLASSIFICATIONS = frozenset({"public", "internal", "confidential"})
+_VALID_CLASSIFICATIONS    = frozenset({"public", "internal", "confidential"})
+_VALID_COLOR_THEMES       = frozenset({
+    "functional", "organic", "plastic", "synthetic", "technical", "electronics",
+})
 
 MAX_SLIDES = 150
 
@@ -92,6 +95,15 @@ def validate_plan(plan: dict) -> list:
         raise ValidationError(
             f"Unknown classification '{meta.get('classification')}'. "
             f"Must be Public, Internal, or Confidential."
+        )
+
+    # Soft: unknown color_theme — warn but don't block.
+    color_theme = str(meta.get("color_theme") or "").strip().lower()
+    if color_theme and color_theme not in _VALID_COLOR_THEMES:
+        warnings.append(
+            f"Unknown color_theme '{meta.get('color_theme')}'. "
+            f"Valid values: {sorted(_VALID_COLOR_THEMES)}. "
+            f"Defaulting to 'plastic'."
         )
 
     # Hard: slide count cap — prevents memory exhaustion from crafted plans.

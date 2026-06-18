@@ -61,6 +61,7 @@ no code fences. The JSON must conform exactly to the schema below.
     "month_year":     string,          // e.g. "June 2026"
     "audience":       string,
     "deck_style":     "merck_executive" | "merck_corporate" | "merck_storytelling",
+    "color_theme":    "plastic" | "functional" | "organic" | "synthetic" | "technical" | "electronics",
     "variety_mode":   "default" | "creative",
     "show_disclaimer": boolean
   },
@@ -193,6 +194,17 @@ Visual / story:
    style="merck_executive" AND page_function to the same string:
      "Executive Summary" | "Recommendation" | "Decision Request" | "Risk" | "Tradeoff"
    The library triggers on category (not page_function) — both must agree.
+
+4b. color_theme selects the Merck Corporate Design template variant. Choose
+    based on the nature and audience of the source content:
+    - "plastic"     → default; lime-green cover, pink/magenta accents. General purpose.
+    - "functional"  → teal/lightblue accents; organic cell shapes. Life science, biology.
+    - "organic"     → red accents on warm cream background. Healthcare, patient focus.
+    - "synthetic"   → dark purple background, yellow accents. Industrial, chemistry.
+    - "technical"   → teal accents on cream background, angular shapes. Engineering, IT.
+    - "electronics" → dark purple background, yellow, cover has editable photo placeholder.
+                      EMD Electronics division or technology-product audiences.
+    When unsure, omit color_theme — it defaults to "plastic".
 
 5. If content cannot be confidently inferred from the source, use
    "[PLACEHOLDER: description]" as the value so a human can fill it in.

@@ -43,14 +43,72 @@ from merck_pptx.merck_layouts import (
 from merck_pptx.validate_plan import validate_plan, ValidationError
 
 _PKG_DIR = pathlib.Path(__file__).parent
-_TEMPLATES = {
-    "eu":     _PKG_DIR / "templates" / "EU_Merck_Themed.pptx",
-    "usa":    _PKG_DIR / "templates" / "USA_Merck_Themed_Base_v1.pptx",
-    "us":     _PKG_DIR / "templates" / "USA_Merck_Themed_Base_v1.pptx",
-    "canada": _PKG_DIR / "templates" / "USA_Merck_Themed_Base_v1.pptx",
+_TEMPLATE_DIR = _PKG_DIR / "templates"
+
+# Region-only defaults (backward compatibility / fallback).
+_TEMPLATES_BY_REGION = {
+    "eu":     _TEMPLATE_DIR / "EU_Merck_Themed.pptx",
+    "usa":    _TEMPLATE_DIR / "USA_Merck_Themed_Base_v1.pptx",
+    "us":     _TEMPLATE_DIR / "USA_Merck_Themed_Base_v1.pptx",
+    "canada": _TEMPLATE_DIR / "USA_Merck_Themed_Base_v1.pptx",
 }
-_TEMPLATE_DEFAULT = _PKG_DIR / "templates" / "EU_Merck_Themed.pptx"
-_TEMPLATE_DIR     = _PKG_DIR / "templates"
+
+# Per-theme template file names.  The file must exist in _TEMPLATE_DIR.
+# Missing files silently fall back to the region default.
+# Keys: (region, color_theme) — region normalised to lowercase "eu" / "usa".
+_THEME_TEMPLATE_NAMES = {
+    # EU / global Merck brand
+    ("eu",  "plastic"):     "EU_Merck_Themed.pptx",          # current default
+    ("eu",  "functional"):  "EU_Merck_Functional.pptx",
+    ("eu",  "organic"):     "EU_Merck_Organic.pptx",
+    ("eu",  "synthetic"):   "EU_Merck_Synthetic.pptx",
+    ("eu",  "technical"):   "EU_Merck_Technical.pptx",
+    ("eu",  "electronics"): "EU_Merck_Electronics.pptx",
+    # USA / Canada — export from empower > 3 U.S. and Canada Business logos
+    ("usa", "plastic"):     "USA_Merck_Themed_Base_v1.pptx",
+    ("usa", "functional"):  "USA_Merck_Functional.pptx",
+    ("usa", "organic"):     "USA_Merck_Organic.pptx",
+    ("usa", "synthetic"):   "USA_Merck_Synthetic.pptx",
+    ("usa", "technical"):   "USA_Merck_Technical.pptx",
+    ("usa", "electronics"): "USA_Merck_Electronics.pptx",
+}
+
+_TEMPLATE_DEFAULT = _TEMPLATE_DIR / "EU_Merck_Themed.pptx"
+
+# Keep the old key format for backward compatibility with any direct callers.
+_TEMPLATES = {
+    "eu":     _TEMPLATE_DIR / "EU_Merck_Themed.pptx",
+    "usa":    _TEMPLATE_DIR / "USA_Merck_Themed_Base_v1.pptx",
+    "us":     _TEMPLATE_DIR / "USA_Merck_Themed_Base_v1.pptx",
+    "canada": _TEMPLATE_DIR / "USA_Merck_Themed_Base_v1.pptx",
+}
+
+
+def _resolve_template(region: str, color_theme: str) -> pathlib.Path:
+    """Return the best-matching template file for (region, color_theme).
+
+    Lookup order:
+    1. (region, color_theme) → named theme template (if file exists on disk)
+    2. region default         → _TEMPLATES_BY_REGION
+    3. global default         → EU_Merck_Themed.pptx
+    """
+    r = str(region or "eu").lower().strip()
+    t = str(color_theme or "plastic").lower().strip()
+    # Normalise region aliases.
+    if r in ("us", "canada"):
+        r = "usa"
+    # 1. Theme-specific template.
+    fname = _THEME_TEMPLATE_NAMES.get((r, t))
+    if fname:
+        candidate = _TEMPLATE_DIR / fname
+        if candidate.exists():
+            return candidate
+    # 2. Region default.
+    region_default = _TEMPLATES_BY_REGION.get(r)
+    if region_default and region_default.exists():
+        return region_default
+    # 3. Global fallback.
+    return _TEMPLATE_DEFAULT
 
 # Permitted image file extensions — prevents a crafted plan from embedding
 # arbitrary files (e.g. databases, documents) by disguising them as images.
@@ -197,10 +255,24 @@ def _autofill_agenda(plan: dict) -> None:
 # Style helpers
 # ---------------------------------------------------------------------------
 
+_VALID_COLOR_THEMES = frozenset({
+    "functional", "organic", "plastic", "synthetic", "technical", "electronics",
+})
+
+
 def _resolve_style(slide: dict, meta: dict) -> str:
     style = slide.get("style", "inherit")
     if style == "inherit" or not style:
-        style = meta.get("deck_style", "merck_executive")
+        # Use deck_style if set; otherwise fall back to color_theme so the
+        # 6 theme palettes are automatically applied without setting deck_style.
+        deck_style   = meta.get("deck_style")
+        color_theme  = str(meta.get("color_theme") or "").lower().strip()
+        if deck_style:
+            style = deck_style
+        elif color_theme in _VALID_COLOR_THEMES:
+            style = color_theme
+        else:
+            style = "merck_executive"
     if slide.get("page_function") in AUTO_PROMOTE_EXECUTIVE:
         style = "merck_executive"
     return style
@@ -247,6 +319,7 @@ def _build_cover(prs, meta, slide, total):
         top_bar=bool(meta.get("cover_top_bar", False)),
         page=slide.get("page"),
         total=total,
+        color_theme=str(meta.get("color_theme") or "").lower().strip() or None,
     )
 
 
@@ -1280,8 +1353,9 @@ def build_from_plan(plan, output_path, base_pptx: Optional[str] = None,
         s["page"] = f"A{i}"
 
     if base_pptx is None:
-        region = str(meta.get("region", "eu")).lower().strip()
-        template_path = _TEMPLATES.get(region, _TEMPLATE_DEFAULT)
+        region       = str(meta.get("region", "eu")).lower().strip()
+        color_theme  = str(meta.get("color_theme") or "plastic").lower().strip()
+        template_path = _resolve_template(region, color_theme)
     else:
         # Security: restrict base_pptx to the package templates directory so
         # a caller cannot force-load an arbitrary or maliciously crafted .pptx.

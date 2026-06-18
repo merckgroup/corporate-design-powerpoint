@@ -79,22 +79,40 @@ FONT_BODY = "Verdana"
 SLIDE_W = Inches(13.333)
 SLIDE_H = Inches(7.5)
 
-# Merck Liquid Carbon master palette (v29 — exact hex from LC theme generator).
-# Three-tier brand hierarchy: Primary → Secondary → Tertiary
-MERCK_PURPLE = (0x50, 0x32, 0x91)   # #503291 — PRIMARY: Rich Purple (purple-800 ≈ #4F3290)
-MERCK_BLUE   = (0x0E, 0x69, 0xAF)   # #0E69AF — SECONDARY: Rich Blue (blue-700, LC official)
-MERCK_GOLD   = (0xEB, 0x3C, 0x96)   # #EB3C96 — TERTIARY: Vibrant Magenta (brand exact)
-PURPLE_DEEP  = (0x3A, 0x24, 0x68)   # #3A2468 — footer / dark backgrounds
-PURPLE_MUTED = (0x7D, 0x74, 0xA0)   # #7D74A0 — muted / separator
-MERCK_YELLOW = (0xFF, 0xC8, 0x32)   # #FFC832 — yellow accent (brand yellow)
-MERCK_AQUA   = (0x96, 0xD7, 0xD2)   # #96D7D2 — sensitive-blue (LC exact)
-LIGHT_GRAY   = (0xE0, 0xE0, 0xE0)   # #E0E0E0 — rules / borders
-PANEL_LIGHT  = (0xF4, 0xF2, 0xF8)   # #F4F2F8 — card panel background
-WHITE        = (0xFF, 0xFF, 0xFF)
-INK_DARK     = (0x1A, 0x16, 0x26)   # #1A1626 — primary body text
-INK_GRAY     = (0x55, 0x5D, 0x6E)   # #555D6E — secondary text / sources
-BAD_RED      = (0xE6, 0x1E, 0x50)   # #E61E50 — Liquid Carbon deviation negative
-GOOD_GREEN   = (0x14, 0x9B, 0x5F)   # #149B5F — Merck brand green (exact)
+# ---------------------------------------------------------------------------
+# Merck Corporate Design official palette (exact hex from brand guidelines).
+# Full set:  violet, blue, green, red, pink, lightblue, lightgreen, yellow,
+#            palepink, paleblue, palegreen, paleyellow, grey
+# ---------------------------------------------------------------------------
+MERCK_PURPLE  = (0x50, 0x32, 0x91)   # #503291 — violet     PRIMARY
+MERCK_BLUE    = (0x0F, 0x69, 0xAF)   # #0F69AF — blue       SECONDARY
+MERCK_GOLD    = (0xEB, 0x3C, 0x96)   # #EB3C96 — pink       TERTIARY (was MERCK_GOLD)
+PURPLE_DEEP   = (0x3A, 0x24, 0x68)   # #3A2468 — footer / dark backgrounds
+PURPLE_MUTED  = (0x7D, 0x74, 0xA0)   # #7D74A0 — muted / separator
+MERCK_YELLOW  = (0xFF, 0xC8, 0x32)   # #FFC832 — yellow
+MERCK_AQUA    = (0x96, 0xD7, 0xD2)   # #96D7D2 — paleblue   (sensitive-blue)
+LIGHT_GRAY    = (0xE0, 0xE0, 0xE0)   # #E0E0E0 — rules / borders
+PANEL_LIGHT   = (0xF4, 0xF2, 0xF8)   # #F4F2F8 — card panel background
+WHITE         = (0xFF, 0xFF, 0xFF)
+INK_DARK      = (0x1A, 0x16, 0x26)   # #1A1626 — primary body text
+INK_GRAY      = (0x55, 0x5D, 0x6E)   # #555D6E — secondary text / sources
+BAD_RED       = (0xE6, 0x1E, 0x50)   # #E61E50 — red
+GOOD_GREEN    = (0x14, 0x9B, 0x5F)   # #149B5F — green
+
+# Full official Merck Corporate Design colour names (for theme palettes).
+_MC_VIOLET     = MERCK_PURPLE          # #503291
+_MC_BLUE       = MERCK_BLUE            # #0F69AF
+_MC_GREEN      = GOOD_GREEN            # #149B5F
+_MC_RED        = BAD_RED               # #E61E50
+_MC_PINK       = MERCK_GOLD            # #EB3C96
+_MC_LIGHTBLUE  = (0x2D, 0xBE, 0xCD)   # #2DBECD
+_MC_LIGHTGREEN = (0xA5, 0xCD, 0x50)   # #A5CD50  (= OP_LIME)
+_MC_YELLOW     = MERCK_YELLOW          # #FFC832
+_MC_PALEPINK   = (0xE1, 0xC3, 0xCD)   # #E1C3CD
+_MC_PALEBLUE   = MERCK_AQUA            # #96D7D2
+_MC_PALEGREEN  = (0xB4, 0xDC, 0x96)   # #B4DC96
+_MC_PALEYELLOW = (0xFF, 0xDC, 0xB9)   # #FFDCB9
+_MC_GREY       = (0x99, 0x99, 0x99)   # #999999
 
 # Liquid Carbon LS dashboard data-series palette (from LS dashboard legend).
 # Use these for chart series, RAG indicators, and data comparisons.
@@ -188,6 +206,119 @@ PALETTES = {
         "warn":      MERCK_YELLOW,
         "bad":       BAD_RED,
         "lime":      OP_LIME,
+    },
+    # ------------------------------------------------------------------
+    # Official Merck Corporate Design themes (6 variants).
+    # Theme names match the empower library folder names exactly.
+    # Light themes use WHITE content bg; dark themes use MERCK_PURPLE.
+    # ------------------------------------------------------------------
+    "functional": {       # lightgreen bg cover, teal accent, organic cells
+        "bg":        WHITE,
+        "ink":       INK_DARK,
+        "ink_2":     INK_GRAY,
+        "ink_3":     LIGHT_GRAY,
+        "accent":    _MC_LIGHTBLUE,
+        "accent_2":  MERCK_PURPLE,
+        "accent_3":  _MC_LIGHTGREEN,
+        "highlight": _MC_LIGHTBLUE,
+        "hot":       _MC_LIGHTGREEN,
+        "rule":      LIGHT_GRAY,
+        "panel":     (0xF0, 0xF9, 0xFA),    # very pale teal
+        "muted":     _MC_PALEBLUE,
+        "good":      GOOD_GREEN,
+        "warn":      MERCK_YELLOW,
+        "bad":       BAD_RED,
+        "lime":      _MC_LIGHTGREEN,
+    },
+    "organic": {          # paleyellow bg cover, red accent, warm life-science
+        "bg":        WHITE,
+        "ink":       INK_DARK,
+        "ink_2":     INK_GRAY,
+        "ink_3":     LIGHT_GRAY,
+        "accent":    _MC_RED,
+        "accent_2":  MERCK_PURPLE,
+        "accent_3":  _MC_PALEYELLOW,
+        "highlight": _MC_RED,
+        "hot":       _MC_PALEYELLOW,
+        "rule":      LIGHT_GRAY,
+        "panel":     (0xFD, 0xF5, 0xED),    # very pale warm
+        "muted":     _MC_PALEPINK,
+        "good":      GOOD_GREEN,
+        "warn":      MERCK_YELLOW,
+        "bad":       _MC_RED,
+        "lime":      _MC_LIGHTGREEN,
+    },
+    "plastic": {          # lightgreen bg cover, pink accent — current default
+        "bg":        WHITE,
+        "ink":       INK_DARK,
+        "ink_2":     INK_GRAY,
+        "ink_3":     LIGHT_GRAY,
+        "accent":    MERCK_PURPLE,
+        "accent_2":  PURPLE_DEEP,
+        "accent_3":  LY_CYAN,
+        "highlight": _MC_PINK,
+        "hot":       _MC_LIGHTGREEN,
+        "rule":      LIGHT_GRAY,
+        "panel":     PANEL_LIGHT,
+        "muted":     PURPLE_MUTED,
+        "good":      GOOD_GREEN,
+        "warn":      MERCK_YELLOW,
+        "bad":       BAD_RED,
+        "lime":      OP_LIME,
+    },
+    "synthetic": {        # dark violet bg, yellow accent, industrial
+        "bg":        MERCK_PURPLE,
+        "ink":       WHITE,
+        "ink_2":     PANEL_LIGHT,
+        "ink_3":     PURPLE_MUTED,
+        "accent":    _MC_YELLOW,
+        "accent_2":  _MC_LIGHTBLUE,
+        "accent_3":  _MC_LIGHTGREEN,
+        "highlight": _MC_YELLOW,
+        "hot":       _MC_LIGHTBLUE,
+        "rule":      PURPLE_MUTED,
+        "panel":     (0x3F, 0x28, 0x70),    # dark panel (lighter than bg)
+        "muted":     PURPLE_MUTED,
+        "good":      GOOD_GREEN,
+        "warn":      _MC_YELLOW,
+        "bad":       BAD_RED,
+        "lime":      _MC_LIGHTGREEN,
+    },
+    "technical": {        # paleyellow bg, teal/lightblue, angular shapes
+        "bg":        WHITE,
+        "ink":       INK_DARK,
+        "ink_2":     INK_GRAY,
+        "ink_3":     LIGHT_GRAY,
+        "accent":    _MC_LIGHTBLUE,
+        "accent_2":  MERCK_PURPLE,
+        "accent_3":  _MC_PALEYELLOW,
+        "highlight": _MC_LIGHTBLUE,
+        "hot":       _MC_PALEYELLOW,
+        "rule":      LIGHT_GRAY,
+        "panel":     (0xF0, 0xF9, 0xFA),    # very pale teal (same as functional)
+        "muted":     _MC_PALEBLUE,
+        "good":      GOOD_GREEN,
+        "warn":      MERCK_YELLOW,
+        "bad":       BAD_RED,
+        "lime":      _MC_LIGHTGREEN,
+    },
+    "electronics": {      # dark violet bg, yellow accent, photo placeholder on cover
+        "bg":        MERCK_PURPLE,
+        "ink":       WHITE,
+        "ink_2":     PANEL_LIGHT,
+        "ink_3":     PURPLE_MUTED,
+        "accent":    _MC_YELLOW,
+        "accent_2":  _MC_LIGHTBLUE,
+        "accent_3":  _MC_LIGHTGREEN,
+        "highlight": _MC_YELLOW,
+        "hot":       _MC_LIGHTBLUE,
+        "rule":      PURPLE_MUTED,
+        "panel":     (0x3F, 0x28, 0x70),
+        "muted":     PURPLE_MUTED,
+        "good":      GOOD_GREEN,
+        "warn":      _MC_YELLOW,
+        "bad":       BAD_RED,
+        "lime":      _MC_LIGHTGREEN,
     },
 }
 
@@ -283,8 +414,11 @@ def _palette_for(style: str) -> dict:
     return PALETTES.get(style, PALETTES["merck_executive"])
 
 
+_DARK_STYLES = frozenset({"merck_storytelling", "synthetic", "electronics"})
+
+
 def _is_dark(style: str) -> bool:
-    return style == "merck_storytelling"
+    return style in _DARK_STYLES
 
 
 def rgb(palette_name: str, key: str) -> RGBColor:
@@ -445,6 +579,58 @@ def _intro_layout(prs: Presentation):
             if has_title and has_subtitle:
                 return layout
     # 2. No themed cover available — caller will fall back.
+    return None
+
+
+def _divider_layout(prs: Presentation):
+    """Return the template's native 'Divider' layout, or None.
+
+    The Merck base template includes a branded section-divider layout (index 10,
+    named 'Divider') that carries the organic blob shapes and colour scheme.
+    Using it makes dividers visually consistent with covers from the same template.
+
+    Layout must have placeholder idx=0 (TITLE — section number) and idx=13
+    (BODY — chapter title).  'Divider plain' (no number) is intentionally skipped.
+    """
+    if prs is None:
+        return None
+    for layout in prs.slide_layouts:
+        name = str(layout.name).strip().lower()
+        if name != "divider":          # skip "divider plain" and others
+            continue
+        try:
+            placeholders = list(layout.placeholders)
+        except Exception:
+            continue
+        has_title = any(ph.placeholder_format.idx == 0  for ph in placeholders)
+        has_body  = any(ph.placeholder_format.idx == 13 for ph in placeholders)
+        if has_title and has_body:
+            return layout
+    return None
+
+
+def _cover_picture_layout(prs: Presentation):
+    """Return the 'Title with picture' cover layout for EMD Electronics, or None.
+
+    This layout (index 2 in the Merck base template, named 'Title with picture')
+    includes a PICTURE placeholder (idx=20) that the user fills in PowerPoint
+    after generation.  It is only used when color_theme == 'electronics'.
+    """
+    if prs is None:
+        return None
+    for layout in prs.slide_layouts:
+        name = str(layout.name).strip().lower()
+        if "picture" not in name:
+            continue
+        try:
+            placeholders = list(layout.placeholders)
+        except Exception:
+            continue
+        has_title    = any(ph.placeholder_format.idx == 0  for ph in placeholders)
+        has_subtitle = any(ph.placeholder_format.idx == 1  for ph in placeholders)
+        has_picture  = any(ph.placeholder_format.idx == 20 for ph in placeholders)
+        if has_title and has_subtitle and has_picture:
+            return layout
     return None
 
 
@@ -1375,17 +1561,17 @@ def _takeaway_band(slide, text, palette):
     """
     if not text:
         return None
-    pal = _palette_for(palette)
+    pal  = _palette_for(palette)
     dark = _is_dark(palette)
-    if palette == "merck_corporate":
-        fill = MERCK_YELLOW
-        text_color = PURPLE_DEEP
-    elif dark:
-        fill = MERCK_GOLD
-        text_color = PURPLE_DEEP
-    else:
-        fill = MERCK_PURPLE
-        text_color = WHITE
+    # Band fill: use the theme's primary accent colour so each theme's
+    # takeaway band is visually distinct.  Dark themes use "hot" (their
+    # bright accent on dark bg); light themes use "accent".
+    fill = pal["hot"] if dark else pal["accent"]
+    # Text colour: pick white or near-black based on perceived luminance of
+    # the fill so readability is maintained for all 6 themes.
+    r, g, b = fill
+    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+    text_color = PURPLE_DEEP if luminance > 140 else WHITE
     band = rounded(slide, Inches(0.65), TAKEAWAY_Y, Inches(11.1), TAKEAWAY_H,
                    fill=fill, adj=50000)
     tf = band.text_frame
@@ -2643,7 +2829,7 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
                 key_messages=None, phases=None, action_title=None,
                 page=None, total=None, section_number=None, category=None,
                 authors=None, top_bar=False, methodology_note=None,
-                content=None):
+                content=None, color_theme=None):
     """Cover slide.
 
     Preferred path: when the Merck themed base is loaded, this uses the
@@ -2654,6 +2840,10 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
       - Title 1 (idx 0): action_title (keep short, ≤60 chars)
       - Subtitle 2 (idx 1): subtitle (main subtitle, multi-line OK)
       - Name/Date (idx 10): name + month_year on two lines
+
+    Electronics theme path: uses the 'Title with picture' layout (index 2).
+    The PICTURE placeholder (idx 20) is left empty so the user can add their
+    own image in PowerPoint after generation.
 
     Fallback path: when no themed layout is found (generic python-pptx
     deck), draws the cover chrome from scratch — the legacy behavior.
@@ -2672,8 +2862,24 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
     if title is None:
         title = action_title if action_title is not None else ""
 
+    # For Electronics theme, try the 'Title with picture' layout first.
+    theme_lower = str(color_theme or "").lower()
+    if theme_lower == "electronics":
+        pic_layout = _cover_picture_layout(prs)
+        if pic_layout is not None:
+            import sys
+            print(
+                "INFO: Electronics cover — image placeholder (idx 20) left "
+                "empty for manual editing in PowerPoint.",
+                file=sys.stderr,
+            )
+            intro_layout = pic_layout
+        else:
+            intro_layout = _intro_layout(prs)
+    else:
+        intro_layout = _intro_layout(prs)
+
     # Themed-layout path: drop the visual chrome onto the template.
-    intro_layout = _intro_layout(prs)
     if intro_layout is not None:
         slide = prs.slides.add_slide(intro_layout)
         # Flatten tuple titles to a single string; the template's Title 1
@@ -2962,7 +3168,16 @@ def build_section_divider(prs, meta, number=None, title=None, style="merck_execu
                           section_number=None, category=None,
                           takeaway=None, source=None,
                           methodology_note=None, content=None):
-    """Section divider with a huge number and uppercase title.
+    """Section divider with a section number and chapter title.
+
+    Preferred path: uses the template's native 'Divider' layout (branded
+    organic blob shapes, colour scheme from the theme template file).  The
+    section number goes into placeholder idx=0 and the chapter title into
+    idx=13.
+
+    Fallback path (no 'Divider' layout found): draws the divider from scratch
+    using the programmatic chrome — a large serif number at left and an italic
+    title at right with a gold rule below.
 
     title (also accepted as action_title) is the section heading.
     methodology_note is accepted for caller consistency and ignored.
@@ -2972,29 +3187,57 @@ def build_section_divider(prs, meta, number=None, title=None, style="merck_execu
         if "title"  in content: title  = content["title"]
     if title is None:
         title = action_title if action_title is not None else ""
+
+    # Format the section number as a zero-padded two-digit string.
+    num_str = ""
+    if number is not None:
+        try:
+            num_str = f"{int(number):02d}"
+        except (TypeError, ValueError):
+            num_str = str(number)
+
     pal = _palette_for(style)
+
+    # ------------------------------------------------------------------
+    # Preferred path: native template Divider layout.
+    # ------------------------------------------------------------------
+    divider_layout = _divider_layout(prs)
+    if divider_layout is not None:
+        slide = prs.slides.add_slide(divider_layout)
+        # Populate number placeholder (idx 0).
+        if num_str:
+            _populate_placeholder(0, slide, num_str)
+        # Populate chapter title placeholder (idx 13).
+        _populate_placeholder(13, slide, str(title))
+        # Add bottom chrome (classification + page number).
+        _bottom_chrome(slide, meta, "Section", page, total, style)
+        return slide
+
+    # ------------------------------------------------------------------
+    # Fallback: programmatic renderer (no themed template available).
+    # ------------------------------------------------------------------
     slide = _new_slide(prs, bg_color=pal["bg"])
     _top_chrome(slide, meta, None, style, page=page, total=total)
     _bottom_chrome(slide, meta, "Section", page, total, style)
 
     dark = _is_dark(style)
-    number_color = MERCK_YELLOW if dark else MERCK_PURPLE
-    title_color = WHITE if dark else INK_DARK
-    accent_color = MERCK_GOLD
+    number_color  = pal["hot"]       if dark else pal["accent"]
+    title_color   = WHITE            if dark else INK_DARK
+    accent_color  = pal["highlight"]            # was hardcoded MERCK_GOLD
 
     # Huge serif number at left.
     txt(slide, Inches(0.65), Inches(1.80), Inches(5.0), Inches(3.20),
-        str(number), sz=140, color=number_color, bold=True, font=FONT_HEAD,
-        anchor=MSO_ANCHOR.MIDDLE)
+        str(num_str or number or ""), sz=140, color=number_color, bold=True,
+        font=FONT_HEAD, anchor=MSO_ANCHOR.MIDDLE)
     # Title to the right (uppercase tracking-wide).
     txt(slide, Inches(5.50), Inches(3.10), Inches(7.5), Inches(0.40),
-        _tracked(title), sz=13, color=MERCK_GOLD, bold=True, font=FONT_BODY,
+        _tracked(title), sz=13, color=accent_color, bold=True, font=FONT_BODY,
         anchor=MSO_ANCHOR.TOP)
     # Italic phrase below.
     txt(slide, Inches(5.50), Inches(3.55), Inches(7.5), Inches(1.20),
         str(title), sz=32, color=title_color, italic=True, bold=True,
         font=FONT_HEAD)
-    # Accent rule.
+    # Accent rule — colour from palette (was hardcoded MERCK_GOLD).
     hairline(slide, Inches(5.50), Inches(5.05), Inches(2.4),
              Emu(int(Pt(2.5))), accent_color)
 
