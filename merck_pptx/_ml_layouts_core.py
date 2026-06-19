@@ -342,7 +342,16 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
         title_part    = title_part.strip()
         subtitle_part = subtitle_part.strip()
 
-        ph_title = _populate_placeholder(0, slide, title_part)
+        # Theme-dependent colors — must be computed before populating any
+        # placeholder so both title and body placeholders use the right color.
+        # The template's title placeholder defines its own scheme color that
+        # resolves to a nearly invisible tint on light-green backgrounds
+        # (functional, organic) — always override with an explicit value.
+        _cover_dark  = theme_lower in ("synthetic", "electronics")
+        _title_color = WHITE       if _cover_dark else MERCK_PURPLE
+        _body_color  = PANEL_LIGHT if _cover_dark else INK_GRAY
+
+        ph_title = _populate_placeholder(0, slide, title_part, color=_title_color)
         if ph_title is not None and ph_title.has_text_frame:
             try:
                 from pptx.enum.text import MSO_AUTO_SIZE
@@ -353,9 +362,6 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
         # Theme-dependent body text color for subtitle / name-date placeholders.
         # The USA template can inherit teal from its theme master; explicitly
         # override so these placeholders always use a CD-compliant neutral.
-        _cover_dark = theme_lower in ("synthetic", "electronics")
-        _body_color = PANEL_LIGHT if _cover_dark else INK_GRAY
-
         # Populate subtitle placeholder (idx 1) with subtitle_part if the
         # slide had no explicit subtitle and the title contained a ';' split.
         if subtitle_part and not subtitle:
