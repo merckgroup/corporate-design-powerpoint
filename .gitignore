@@ -53,3 +53,6 @@ secrets.yaml
 # OS
 .DS_Store
 Thumbs.db
+tests/
+merck_pptx/test_fixes.py
+config.yaml

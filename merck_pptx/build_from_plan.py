@@ -593,6 +593,8 @@ def _build_agenda(prs, meta, slide, total):
         action_title=slide.get("action_title"),
         page=slide.get("page"),
         total=total,
+        show_duration=bool(c.get("show_duration")),
+        show_speaker=bool(c.get("show_speaker")),
     )
 
 
@@ -1364,7 +1366,10 @@ def _build_photo_text(prs, meta, slide, total):
         image_label=c.get("image_label"),
         title=c.get("title"),
         bullets=c.get("bullets", []),
+        body=c.get("body"),
+        caption=c.get("caption"),
         image_side=c.get("image_side", "left"),
+        subtitle=slide.get("subtitle"),
         **_common_kwargs(slide, meta, total),
     )
 

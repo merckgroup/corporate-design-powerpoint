@@ -44,6 +44,117 @@ from ._ml_charts import (
 )
 from ._ml_helpers import _style_or_promote, _tone_color, _rag_color, _norm_key
 
+import os as _os
+from copy import deepcopy as _deepcopy
+
+def _empower_binary_dir() -> str:
+    """Return the empower BinaryFiles path from config (or auto-detected default)."""
+    try:
+        from .config import empower_binary_dir
+        return empower_binary_dir()
+    except Exception:
+        _local = _os.environ.get(
+            "LOCALAPPDATA",
+            _os.path.join(_os.path.expanduser("~"), "AppData", "Local")
+        )
+        return _os.path.join(_local, "empower", "data", "empower", "BinaryFiles")
+
+_COVER_SHAPE_UIDS = {
+    "plastic":     "3602214c-15c6-4132-a2c7-eadbbb3c1279",
+    "functional":  "d1c34b6f-9d6d-4de0-b97f-81d093db01b7",
+    "organic":     "131b853d-e559-4bad-b753-ac7735622df6",
+    "synthetic":   "651fa373-badd-452b-a208-4a55f7596717",
+    "technical":   "b46b3c65-5eac-4c24-99bd-6dd953e7bcad",
+    "electronics": "355a4c87-ee66-42c4-91e1-8d7f683c6c62",
+}
+
+_NS_P = "http://schemas.openxmlformats.org/presentationml/2006/main"
+
+
+def _inject_empower_cover_shapes(slide, color_theme: str) -> bool:
+    """Copy themed cover background shapes from the local empower cache.
+
+    Reads the slide layout of the first slide in the theme-specific BinaryFile
+    PPTX and inserts its non-placeholder, non-logo, non-image freeform/rectangle
+    shapes BEHIND existing content in the cover slide.
+
+    Shapes are sourced from the layout (not the slide itself) because the empower
+    BinaryFile stores the visual identity shapes (Freihandform, Rechteck blobs) in
+    the slide layout's spTree, not in the slide's own spTree.
+
+    The shapes use schemeClr references (accent1, bg1, bg2) so they resolve
+    correctly against the color theme already applied to the output PPTX.
+
+    Silently no-ops if the cache is absent or the PPTX can't be opened.
+    Returns True if any shapes were injected.
+    """
+    uid = _COVER_SHAPE_UIDS.get(str(color_theme).lower())
+    if not uid:
+        return False
+    pptx_path = _os.path.join(_empower_binary_dir(), f"{uid}.pptx")
+    if not _os.path.exists(pptx_path):
+        return False
+    try:
+        from pptx import Presentation as _Prs
+        src_prs = _Prs(pptx_path)
+        if not src_prs.slides:
+            return False
+        src_layout = src_prs.slides[0].slide_layout
+        src_spTree = src_layout.shapes._spTree
+        tgt_spTree = slide.shapes._spTree
+
+        # Compute next safe shape ID by scanning all id= attributes in target spTree.
+        # cNvPr elements in the presentationml spTree use the p: namespace.
+        max_id = max(
+            (int(el.get("id", 0))
+             for el in tgt_spTree.iter()
+             if el.get("id", "").isdigit()),
+            default=100,
+        )
+
+        inserted = 0
+        for element in list(src_spTree):
+            tag = element.tag.split("}")[-1] if "}" in element.tag else element.tag
+
+            # Only copy shape-type elements (sp = shape, grpSp = group shape).
+            # Skip layout infrastructure (nvGrpSpPr, grpSpPr) and image elements (pic).
+            if tag not in ("sp", "grpSp"):
+                continue
+
+            # Skip placeholder shapes (p:ph child element present).
+            if element.find(f".//{{{_NS_P}}}ph") is not None:
+                continue
+
+            # Skip logo group shapes to avoid duplicating the Merck logo.
+            name = ""
+            for cNvPr in element.iter():
+                if cNvPr.tag.split("}")[-1] == "cNvPr":
+                    name = cNvPr.get("name", "")
+                    break
+            if "Logo" in name:
+                continue
+
+            el_copy = _deepcopy(element)
+
+            # Re-ID every cNvPr regardless of namespace so ID conflicts
+            # with existing slide shapes are avoided (group shapes use a
+            # different namespace than simple shapes).
+            for el in el_copy.iter():
+                local = el.tag.split("}")[-1] if "}" in el.tag else el.tag
+                if local == "cNvPr" and el.get("id", "").isdigit():
+                    max_id += 1
+                    el.set("id", str(max_id))
+
+            # Insert at position 2 (after nvGrpSpPr and grpSpPr) so shapes render
+            # BEHIND any existing placeholder content already in the slide.
+            tgt_spTree.insert(2, el_copy)
+            inserted += 1
+
+        return inserted > 0
+    except Exception:
+        return False
+
+
 # ===========================================================================
 # Layout: COVER
 # ===========================================================================
@@ -197,6 +308,12 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
     # Themed-layout path: drop the visual chrome onto the template.
     if intro_layout is not None:
         slide = prs.slides.add_slide(intro_layout)
+
+        # Inject theme-specific cover shapes from empower local cache.
+        # Shapes are copied from the BinaryFile layout spTree and inserted
+        # behind placeholder content so the visual identity is preserved.
+        # No-op if the cache is absent or the theme has no registered UID.
+        _inject_empower_cover_shapes(slide, theme_lower)
 
         # Dark color themes (synthetic, electronics) need a dark slide background.
         # The template's "light panel" freeform is made transparent by
@@ -417,12 +534,19 @@ def build_exec_summary(prs, meta, action_title=None, key_messages=None, takeaway
 def build_agenda(prs, meta, chapters=None, style="merck_executive",
                  page=None, total=None, action_title=None,
                  section_number=None, category=None,
-                 methodology_note=None, content=None):
+                 methodology_note=None, content=None,
+                 show_duration=False, show_speaker=False):
     # action_title is honored when provided; otherwise the title defaults to
     # "INDEX". methodology_note is accepted for caller consistency and ignored.
-    """Agenda / chapters slide (no section marker; INDEX-style title)."""
+    """Agenda / chapters slide (no section marker; INDEX-style title).
+
+    Optional per-chapter keys: duration (str) and speaker (str).
+    Pass show_duration=True and/or show_speaker=True to render those columns.
+    """
     if content:
-        if "chapters" in content: chapters = content["chapters"]
+        if "chapters"      in content: chapters      = content["chapters"]
+        if "show_duration" in content: show_duration = content["show_duration"]
+        if "show_speaker"  in content: show_speaker  = content["show_speaker"]
     pal = _palette_for(style)
     slide = _new_slide(prs, bg_color=pal["bg"])
     _top_chrome(slide, meta, None, style, page=page, total=total)
@@ -463,13 +587,15 @@ def build_agenda(prs, meta, chapters=None, style="merck_executive",
         row_h = (col_h - row_gap * (n - 1)) / n
         for i, ch in enumerate(rows):
             ry = col_top + i * (row_h + row_gap)
-            number = ch.get("number") or _pad_int(i + 1)
-            title = ch.get("title", "")
-            sub = ch.get("subtitle", "")
+            number   = ch.get("number") or _pad_int(i + 1)
+            title    = ch.get("title", "")
+            sub      = ch.get("subtitle", "")
+            duration = ch.get("duration", "")
+            speaker  = ch.get("speaker", "")
             # Number in purple bold. Named with the chapter number so the
             # canonical runner can attach a slide-jump hyperlink in a
             # post-pass after all target slides exist.
-            num_color   = MERCK_PURPLE if not dark else pal["hot"]
+            num_color = MERCK_PURPLE if not dark else pal["hot"]
             num_shape = txt(slide, x0, ry, Inches(0.60), Inches(0.40),
                 str(number), sz=title_sz, color=num_color, bold=True,
                 font=FONT_BODY)
@@ -477,11 +603,18 @@ def build_agenda(prs, meta, chapters=None, style="merck_executive",
                 num_shape.name = f"AgendaChapter_{number}"
             except Exception:
                 pass
+            # Reserve right-hand space for optional duration / speaker columns
+            # so the title box never overlaps them.
+            right_reserved = Inches(0.0)
+            if show_speaker  and speaker:  right_reserved += Inches(1.55)
+            if show_duration and duration: right_reserved += Inches(1.35)
+            title_avail_w = col_w - Inches(0.55) - right_reserved
+
             # Title in INK_DARK bold (also named for hyperlink targeting).
-            # Height is dynamic so long titles can wrap to 2 lines without clipping.
-            title_h = min(row_h * 0.60, Inches(0.52))
+            # Height is generous so long titles can wrap to 2 lines without clipping.
+            title_h = min(row_h * 0.75, Inches(0.70))
             title_shape = txt(slide, x0 + Inches(0.55), ry,
-                col_w - Inches(0.55),
+                max(title_avail_w, Inches(1.0)),
                 title_h,
                 title, sz=title_sz,
                 color=INK_DARK if not dark else WHITE,
@@ -494,11 +627,29 @@ def build_agenda(prs, meta, chapters=None, style="merck_executive",
                 sub_y = ry + title_h + Inches(0.02)
                 sub_h = max(row_h - title_h - Inches(0.06), Inches(0.18))
                 txt(slide, x0 + Inches(0.55), sub_y,
-                    col_w - Inches(0.55),
+                    max(title_avail_w, Inches(1.0)),
                     sub_h,
                     sub, sz=sub_sz,
                     color=INK_GRAY if not dark else PANEL_LIGHT,
                     italic=True, font=FONT_BODY)
+            # Duration and speaker columns — placed from the right edge inward
+            # with at least 0.15" clearance between each other.
+            right_cursor = x0 + col_w
+            if show_speaker and speaker:
+                spk_w = Inches(1.45)
+                right_cursor -= spk_w
+                txt(slide, right_cursor, ry, spk_w, Inches(0.36),
+                    str(speaker), sz=sub_sz,
+                    color=pal["accent"] if not dark else pal["hot"],
+                    font=FONT_BODY, italic=True, anchor=MSO_ANCHOR.MIDDLE)
+                right_cursor -= Inches(0.15)
+            if show_duration and duration:
+                dur_w = Inches(1.20)
+                right_cursor -= dur_w
+                txt(slide, right_cursor, ry, dur_w, Inches(0.36),
+                    str(duration), sz=sub_sz,
+                    color=INK_GRAY if not dark else PANEL_LIGHT,
+                    font=FONT_BODY, align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE)
     _draw_col(rows_left, Inches(0.65))
     _draw_col(rows_right, Inches(0.65) + col_w + Inches(0.50))
     return slide

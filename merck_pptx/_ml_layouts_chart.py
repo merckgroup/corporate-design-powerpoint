@@ -299,6 +299,7 @@ def build_stat_strip(prs, meta, action_title=None, stats=None, takeaway=None,
         if "takeaway" in content: takeaway = content["takeaway"]
     style = _style_or_promote(category, style)
     pal = _palette_for(style)
+    dark = _is_dark(style)
     slide = _new_slide(prs, bg_color=pal["bg"])
     apply_chrome(slide, meta, action_title, category=category,
                  subtitle=subtitle, takeaway=takeaway, source=source,
@@ -352,14 +353,15 @@ def build_stat_strip(prs, meta, action_title=None, stats=None, takeaway=None,
             label_text, sz=10, color=pal["highlight"], bold=True,
             font=FONT_BODY, anchor=MSO_ANCHOR.TOP)
 
-        # Body in INK_GRAY Verdana 11pt.
+        # Body copy — use light color on dark themes for contrast.
         body_text = s.get("body", "")
         body_y = label_y + Inches(0.46)
         body_h = (cy + card_h) - body_y - Inches(0.18)
         if body_h < Inches(0.30):
             body_h = Inches(0.30)
         txt(slide, cx + pad, body_y, card_w - pad * 2, body_h,
-            str(body_text), sz=11, color=INK_GRAY, font=FONT_BODY)
+            str(body_text), sz=11, color=pal["ink_2"] if not dark else PANEL_LIGHT,
+            font=FONT_BODY)
 
     return slide
 

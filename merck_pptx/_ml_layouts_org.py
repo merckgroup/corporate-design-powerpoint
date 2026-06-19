@@ -149,7 +149,11 @@ def build_status_table(prs, meta, action_title=None, columns=None, rows=None, ta
                 # Substring fallback: match if either key contains the other
                 for k, v in row.items():
                     nk = _norm_key(k)
-                    if nk and col_key and (nk in col_key or col_key in nk):
+                    # Only match when one key is a full prefix of the other
+                    # (avoids "status" falsely matching "programme_status").
+                    if nk and col_key and (
+                        col_key.startswith(nk) or nk.startswith(col_key)
+                    ):
                         val = v
                         break
             if val == "":
@@ -258,8 +262,13 @@ def build_hub_spoke(prs, meta, action_title=None, hub=None, spokes=None, takeawa
 
     # Dynamic positions: distribute cards evenly
     # For 1-4: corners; for 5-8: add mid-side positions
-    card_w = Inches(3.40)
-    card_h = Inches(1.55)
+    # Scale card size down for higher spoke counts to prevent overlap
+    if n_sp <= 4:
+        card_w, card_h = Inches(3.40), Inches(1.55)
+    elif n_sp <= 6:
+        card_w, card_h = Inches(2.80), Inches(1.30)
+    else:
+        card_w, card_h = Inches(2.40), Inches(1.10)
     MARGIN_X = Inches(0.30)
     MARGIN_Y = Inches(2.50)
     ZONE_BOT = Inches(6.80)
@@ -279,6 +288,8 @@ def build_hub_spoke(prs, meta, action_title=None, hub=None, spokes=None, takeawa
 
     hub_cx = hub_x + hub_w / 2
     hub_cy = hub_y + hub_h / 2
+    title_sz = 13 if n_sp <= 4 else (11 if n_sp <= 6 else 10)
+    body_sz  = 10 if n_sp <= 4 else 9
     for i, item in enumerate(sp):
         if i >= len(positions):
             break
@@ -291,22 +302,31 @@ def build_hub_spoke(prs, meta, action_title=None, hub=None, spokes=None, takeawa
         pad = Inches(0.22)
         txt(slide, cx + pad, cy + Inches(0.20),
             card_w - pad * 2, Inches(0.45),
-            str(item.get("title", "")), sz=13, color=pal["accent"], bold=True,
+            str(item.get("title", "")), sz=title_sz, color=pal["accent"], bold=True,
             font=FONT_BODY)
         txt(slide, cx + pad, cy + Inches(0.72),
             card_w - pad * 2, card_h - Inches(0.80),
-            str(item.get("body", "")), sz=10, color=INK_GRAY, font=FONT_BODY)
-        # Dashed connector from card edge nearest hub to hub edge.
-        if cx < hub_x:
-            edge_x = cx + card_w
-            edge_y = cy + card_h / 2
-            hub_edge_x = hub_x
-            hub_edge_y = hub_cy
-        else:
-            edge_x = cx
-            edge_y = cy + card_h / 2
-            hub_edge_x = hub_x + hub_w
-            hub_edge_y = hub_cy
+            str(item.get("body", "")), sz=body_sz, color=INK_GRAY, font=FONT_BODY)
+        # Dashed connector: route horizontally when card is primarily to the
+        # side of the hub, vertically when it is above or below (centre slots).
+        card_cx = cx + card_w / 2
+        card_cy = cy + card_h / 2
+        dx = card_cx - hub_cx
+        dy = card_cy - hub_cy
+        if abs(dx) >= abs(dy):          # primarily left / right
+            if dx < 0:
+                edge_x, edge_y       = cx + card_w, card_cy
+                hub_edge_x, hub_edge_y = hub_x, hub_cy
+            else:
+                edge_x, edge_y       = cx, card_cy
+                hub_edge_x, hub_edge_y = hub_x + hub_w, hub_cy
+        else:                           # primarily above / below (centre slots)
+            if dy < 0:
+                edge_x, edge_y       = card_cx, cy + card_h
+                hub_edge_x, hub_edge_y = hub_cx, hub_y
+            else:
+                edge_x, edge_y       = card_cx, cy
+                hub_edge_x, hub_edge_y = hub_cx, hub_y + hub_h
         _dashed_line(slide, edge_x, edge_y, hub_edge_x, hub_edge_y,
                      PURPLE_MUTED, weight=Pt(0.75))
     return slide

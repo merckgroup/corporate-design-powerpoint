@@ -148,12 +148,15 @@ def build_word_cloud(prs, meta, action_title=None, words=None,
     _GRID_ROWS, _GRID_COLS = 5, 6
     _row_h   = _zone_h / _GRID_ROWS
     _col_w   = CONTENT_W / _GRID_COLS
-    GRID = [
-        (CONTENT_X + c * _col_w + _col_w * 0.08 + (r % 2) * _col_w * 0.06,
-         _zone_top  + r * _row_h + _row_h  * 0.12)
-        for r in range(_GRID_ROWS)
-        for c in range(_GRID_COLS)
-    ]
+    GRID = []
+    for r in range(_GRID_ROWS):
+        for c in range(_GRID_COLS):
+            # Deterministic jitter: vary x by up to 25% of col width, y by up to 20% of row height
+            jitter_x = ((r * 7 + c * 3) % 11) / 11.0 * _col_w * 0.25
+            jitter_y = ((r * 3 + c * 11) % 7) / 7.0  * _row_h * 0.20
+            gx = CONTENT_X + c * _col_w + _col_w * 0.04 + jitter_x
+            gy = _zone_top  + r * _row_h + _row_h * 0.10 + jitter_y
+            GRID.append((gx, gy))
 
     for i, word in enumerate(words):
         if i >= len(GRID):
@@ -168,7 +171,7 @@ def build_word_cloud(prs, meta, action_title=None, words=None,
             weight  = max(1.0, min(5.0, float(word.get("weight") or 2)))
             col     = word.get("color") or WORD_COLORS[i % len(WORD_COLORS)]
             word_text = str(word.get("text", ""))
-        sz = int(10 + weight * 5)
+        sz = int(12 + weight * 6)  # range: 18pt (weight=1) to 42pt (weight=5)
         txt(slide, gx, gy, Inches(2.20), Inches(0.46),
             word_text,
             sz=sz, color=col, bold=(weight >= 4.0),
@@ -444,16 +447,19 @@ def build_layered_stack(prs, meta, action_title=None, layers=None,
 
 def build_photo_text(prs, meta, action_title=None, image_path=None,
                      image_label=None, title=None, bullets=None,
+                     body=None, caption=None,
                      image_side="left", takeaway="", source=None,
                      subtitle=None, methodology_note=None,
                      style="merck_executive", page=None, total=None,
                      section_number=None, category=None):
     """Half-slide image panel + half-slide text narrative.
 
-    image_path:  str — path to png/jpg; placeholder drawn if None/missing
-    image_label: str — caption inside the placeholder
-    title:       str — bold heading in the text panel
-    bullets:     list of str — narrative points
+    image_path:  str -- path to png/jpg; placeholder drawn if None/missing
+    image_label: str -- caption inside the placeholder
+    title:       str -- bold heading in the text panel
+    bullets:     list of str -- narrative bullet points
+    body:        str -- prose paragraph shown below bullets when present
+    caption:     str -- small caption line rendered at the bottom of the text panel
     image_side:  'left' (default) or 'right'
     """
     pal = _palette_for(style)
@@ -498,15 +504,33 @@ def build_photo_text(prs, meta, action_title=None, image_path=None,
                  text_w * 0.55, Emu(int(Pt(2))), MERCK_GOLD)
         y_cur += Inches(0.84)
 
-    body_h  = zone_h - (y_cur - zone_y) - Inches(0.10)
-    bullets = list(bullets or [])
+    # Reserve space for caption at the bottom of the text zone when present.
+    caption_h  = Inches(0.34) if caption else Inches(0)
+    body_h     = zone_h - (y_cur - zone_y) - Inches(0.10) - caption_h
+    b_color    = PANEL_LIGHT if dark else INK_DARK
+    bullets    = list(bullets or [])
     if bullets:
-        item_h  = min(body_h / len(bullets), Inches(0.70))
-        b_color = PANEL_LIGHT if dark else INK_DARK
+        item_h = min(body_h / len(bullets), Inches(0.70))
         for i, b in enumerate(bullets):
             txt(slide, text_x, y_cur + i * item_h, text_w, item_h,
                 "•  " + str(b),
                 sz=11, color=b_color, font=FONT_BODY, anchor=MSO_ANCHOR.TOP)
+        y_cur += item_h * len(bullets) + Inches(0.08)
+
+    if body:
+        # Remaining space from current cursor to bottom of text zone
+        body_bottom  = zone_y + zone_h - Inches(0.10) - caption_h
+        body_block_h = max(body_bottom - y_cur, Inches(0.40))
+        txt(slide, text_x, y_cur, text_w, body_block_h,
+            str(body),
+            sz=11, color=b_color, font=FONT_BODY, anchor=MSO_ANCHOR.TOP)
+
+    if caption:
+        cap_y = zone_y + zone_h - caption_h
+        txt(slide, text_x, cap_y, text_w, caption_h,
+            str(caption),
+            sz=9, color=INK_GRAY if not dark else PANEL_LIGHT,
+            italic=True, font=FONT_BODY, anchor=MSO_ANCHOR.BOTTOM)
 
     return slide
 
