@@ -22,7 +22,7 @@ from ._ml_constants import (
 )
 from ._ml_primitives import (
     rect, rounded, oval, circle, line, hairline, txt, _add_run,
-    _freeform_poly, _emu, _apply_fill, _apply_border,
+    _freeform_poly, _emu, _apply_fill, _apply_border, draw_harvey_ball,
 )
 from ._ml_icons import draw_icon, ICON_REGISTRY
 from ._ml_deck import (
@@ -36,7 +36,7 @@ from ._ml_chrome import (
     _tracked, _track_letters, _format_section_number, _pad_int,
     _render_action_title, _source_line,
     statement_card, in_slide_section,
-    _takeaway_band, _superscript,
+    _takeaway_band, _superscript, _callout_block,
 )
 from ._ml_charts import (
     add_slope_chart, add_dot_plot, add_marimekko, add_waterfall,
@@ -273,6 +273,10 @@ def build_decision_rows(prs, meta, action_title=None, decisions=None, takeaway=N
                 ry, owner_w, row_h,
                 f"Owner: {owner}", sz=10, color=PURPLE_MUTED, italic=True,
                 font=FONT_BODY, align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE)
+    callout = (content or {}).get("callout")
+    if isinstance(callout, dict):
+        _callout_block(slide, callout.get("type", "conclusion"),
+                       callout.get("text", ""), pal)
     return slide
 
 
@@ -488,7 +492,7 @@ def build_score_table(prs, meta, action_title=None, rows=None,
                       takeaway="", source=None, subtitle=None,
                       methodology_note=None, style="merck_executive",
                       page=None, total=None, section_number=None,
-                      category=None):
+                      category=None, content=None):
     """Audit/maturity table with visual dot ratings per row.
 
     rows: list of dicts with keys:
@@ -498,6 +502,9 @@ def build_score_table(prs, meta, action_title=None, rows=None,
         note     (str, opt) — brief annotation
     scale: int — max rating (default 5)
     """
+    if content:
+        if "rows"     in content: rows     = content["rows"]
+        if "takeaway" in content: takeaway = content["takeaway"]
     pal = _palette_for(style)
     slide = _new_slide(prs, bg_color=pal["bg"])
     apply_chrome(slide, meta, action_title, category=category,
@@ -536,6 +543,7 @@ def build_score_table(prs, meta, action_title=None, rows=None,
             anchor=MSO_ANCHOR.MIDDLE)
 
     dot_sz, dot_gap = Inches(0.16), Inches(0.06)
+    rating_type = (content or {}).get("rating_type", "dots")
 
     for i, row in enumerate(rows):
         ry = zone_y + header_h + i * row_h
@@ -564,17 +572,27 @@ def build_score_table(prs, meta, action_title=None, rows=None,
 
         rect(slide, col_starts[3], ry, score_w, row_h,
              fill=bg, border=LIGHT_GRAY, border_w=Pt(0.25))
-        score       = float(row.get("score", 0))
-        total_dot_w = scale * (dot_sz + dot_gap) - dot_gap
-        dot_x0      = col_starts[3] + (score_w - total_dot_w) / 2
-        dot_y       = ry + (row_h - dot_sz) / 2
-        for d in range(scale):
-            filled = (d + 1) <= score
-            half   = not filled and d < score < d + 1
-            fill_c = (MERCK_PURPLE if filled else
-                      MERCK_GOLD   if half   else LIGHT_GRAY)
-            circle(slide, dot_x0 + d * (dot_sz + dot_gap), dot_y,
-                   dot_sz, fill=fill_c)
+        score = float(row.get("score", 0))
+        if rating_type == "harvey":
+            # Harvey Ball: score is 0.0-1.0 fill fraction
+            hb_d = Inches(0.30)
+            hb_x = col_starts[3] + (score_w - hb_d) / 2
+            hb_y = ry + (row_h - hb_d) / 2
+            fill_pct = max(0.0, min(1.0, score))
+            draw_harvey_ball(slide, hb_x, hb_y, hb_d, fill_pct,
+                             filled_color=pal["accent"],
+                             border_color=pal["accent"])
+        else:
+            total_dot_w = scale * (dot_sz + dot_gap) - dot_gap
+            dot_x0      = col_starts[3] + (score_w - total_dot_w) / 2
+            dot_y       = ry + (row_h - dot_sz) / 2
+            for d in range(scale):
+                filled = (d + 1) <= score
+                half   = not filled and d < score < d + 1
+                fill_c = (MERCK_PURPLE if filled else
+                          MERCK_GOLD   if half   else LIGHT_GRAY)
+                circle(slide, dot_x0 + d * (dot_sz + dot_gap), dot_y,
+                       dot_sz, fill=fill_c)
 
     return slide
 

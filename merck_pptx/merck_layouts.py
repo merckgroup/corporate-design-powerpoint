@@ -37,6 +37,7 @@ from ._ml_constants import (
 from ._ml_primitives import (
     _apply_fill, _apply_border, _emu,
     rect, rounded, oval, circle, line, hairline, txt, _add_run, _freeform_poly,
+    draw_harvey_ball,
 )
 
 # --- Icons ---
@@ -120,6 +121,7 @@ from ._ml_layouts_process import (
     _CIRCULAR_PRESETS, _draw_check_mark,
     build_phase_process, build_gantt, build_milestone_timeline,
     build_circular_flow, build_arrow_chain, build_funnel, build_journey_map,
+    build_road_to_success,
 )
 
 # --- Layout functions — organizational slides ---
@@ -134,4 +136,5 @@ from ._ml_layouts_org import (
 from ._ml_layouts_visual import (
     build_pull_quote, build_word_cloud, build_pyramid, build_venn,
     build_layered_stack, build_photo_text, build_fishbone,
+    build_key_question,
 )

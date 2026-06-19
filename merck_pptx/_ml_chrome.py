@@ -808,3 +808,39 @@ def _phase_progress(slide, phases, palette):
                 align=PP_ALIGN.CENTER)
 
 
+# ===========================================================================
+# Callout block (conclusion / result / next / future)
+# ===========================================================================
+
+_CALLOUT_GLYPHS = {
+    "conclusion": ">>",
+    "result":     "↓",   # ↓
+    "next":       "→",   # →
+    "future":     "✓",   # ✓
+}
+
+
+def _callout_block(slide, ctype, text, pal, y_top=None):
+    """Render a branded bottom-callout decorator below content.
+
+    ctype: 'conclusion' | 'result' | 'next' | 'future'
+    Snaps to just above the footer by default.
+    """
+    if y_top is None:
+        y_top = FOOTER_Y - Inches(0.58)
+    icon_w = Inches(0.44)
+    full_h = Inches(0.44)
+    glyph  = _CALLOUT_GLYPHS.get(str(ctype).lower(), ">>")
+    ACC    = pal["accent"]
+    INK    = pal["ink"]
+
+    rounded(slide, CONTENT_X, y_top, icon_w, full_h, fill=ACC)
+    txt(slide, CONTENT_X, y_top, icon_w, full_h, glyph,
+        sz=11, color=WHITE, bold=True, font=FONT_BODY,
+        align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+    if text:
+        txt(slide, CONTENT_X + icon_w + Inches(0.12), y_top,
+            CONTENT_W - icon_w - Inches(0.12), full_h,
+            text, sz=11, color=INK, bold=True, font=FONT_BODY,
+            anchor=MSO_ANCHOR.MIDDLE)
+

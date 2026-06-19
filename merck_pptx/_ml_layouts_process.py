@@ -13,6 +13,7 @@ from ._ml_constants import (
     PURPLE_DEEP, PURPLE_MUTED, BAD_RED, GOOD_GREEN,
     ACT_PURPLE, LY_CYAN, OP_LIME, FC_PINK, DEV_POS_BLUE, DEV_NEG_RED,
     CHART_PALETTE, PHASE_1_COLOR, PHASE_2_COLOR, PHASE_3_COLOR,
+    SLIDE_W, SLIDE_H,
     CONTENT_X, CONTENT_Y, CONTENT_Y_SUBTITLE, CONTENT_W, CONTENT_H,
     SOURCE_Y, SOURCE_H, TAKEAWAY_Y, TAKEAWAY_H, PHASE_Y, PHASE_H,
     FOOTER_Y, FOOTER_H, FOOTER_TEXT_Y,
@@ -37,7 +38,7 @@ from ._ml_chrome import (
     _tracked, _track_letters, _format_section_number, _pad_int,
     _render_action_title, _source_line,
     statement_card, in_slide_section,
-    _takeaway_band, _superscript,
+    _takeaway_band, _superscript, _callout_block,
 )
 from ._ml_charts import (
     add_slope_chart, add_dot_plot, add_marimekko, add_waterfall,
@@ -534,7 +535,8 @@ def build_circular_flow(prs, meta, action_title, phases, takeaway="", source=Non
 def build_arrow_chain(prs, meta, action_title, steps, consequence=None,
                       takeaway="", source=None, subtitle=None,
                       methodology_note=None, style="merck_corporate",
-                      page=None, total=None, section_number=None, category=None):
+                      page=None, total=None, section_number=None, category=None,
+                      content=None):
     """Horizontal arrow chain: 3-5 steps + optional consequence box.
 
     steps: list of dicts with keys:
@@ -545,7 +547,7 @@ def build_arrow_chain(prs, meta, action_title, steps, consequence=None,
                  MERCK_YELLOW fill)
     Returns the slide.
     """
-    pal = PALETTES.get(style, PALETTES["merck_corporate"])
+    pal = _palette_for(style)
     slide = _new_slide(prs, bg_color=pal["bg"])
     apply_chrome(slide, meta, action_title, category=category,
                  takeaway=takeaway, source=source, subtitle=subtitle,
@@ -688,6 +690,10 @@ def build_arrow_chain(prs, meta, action_title, steps, consequence=None,
             align=PP_ALIGN.LEFT, font=FONT_BODY,
             anchor=MSO_ANCHOR.TOP)
 
+    callout = (content or {}).get("callout") if content else None
+    if isinstance(callout, dict):
+        _callout_block(slide, callout.get("type", "conclusion"),
+                       callout.get("text", ""), pal)
     return slide
 
 
@@ -844,4 +850,83 @@ def build_journey_map(prs, meta, action_title=None, phases=None, rows=None,
                     str(cell_text), sz=9, color=text_color,
                     font=FONT_BODY, anchor=MSO_ANCHOR.TOP)
 
+    return slide
+
+
+# ===========================================================================
+# Layout: ROAD TO SUCCESS
+# ===========================================================================
+
+def build_road_to_success(prs, meta, action_title=None, stages=None,
+                          milestones=None, takeaway="", source=None,
+                          subtitle=None, methodology_note=None,
+                          style="merck_executive", page=None, total=None,
+                          section_number=None, category=None, content=None):
+    """Horizontal timeline path with milestone dots and stage columns below.
+
+    content keys:
+        stages     (list of {title, body}) — 2-4 stage columns below the path
+        milestones (list of str)           — 2-6 labels along the path (alternating above/below)
+    """
+    if content:
+        stages     = stages     or content.get("stages")
+        milestones = milestones or content.get("milestones")
+    style = _style_or_promote(category, style)
+    pal   = _palette_for(style)
+    slide = _new_slide(prs, bg_color=pal["bg"])
+    apply_chrome(slide, meta, action_title, category=category,
+                 takeaway=takeaway, source=source, subtitle=subtitle,
+                 methodology_note=methodology_note,
+                 page=page, total=total, section_number=section_number,
+                 palette=style)
+
+    PATH_Y  = Inches(3.60)
+    PATH_X0 = CONTENT_X
+    PATH_W  = CONTENT_W
+    ACC     = pal["accent"]
+    INK     = pal["ink"]
+    INK2    = pal["ink_2"]
+
+    # Path: thick accent-coloured hairline spanning slide width
+    hairline(slide, PATH_X0, PATH_Y, PATH_W, Emu(int(Pt(3))), ACC)
+
+    # Milestone dots along the path
+    mss = list(milestones or [])[:6]
+    if mss:
+        dot_d = Inches(0.15)
+        n_ms  = len(mss)
+        for i, ms in enumerate(mss):
+            frac  = i / max(n_ms - 1, 1)
+            dot_x = PATH_X0 + (PATH_W - dot_d) * frac
+            circle(slide, dot_x, PATH_Y - dot_d / 2, dot_d, fill=ACC)
+            if ms:
+                lbl_y = (PATH_Y - Inches(0.32) if i % 2 == 0
+                         else PATH_Y + dot_d + Inches(0.04))
+                txt(slide, dot_x - Inches(0.38), lbl_y,
+                    Inches(0.90), Inches(0.22),
+                    str(ms), sz=9, color=INK2, font=FONT_BODY,
+                    align=PP_ALIGN.CENTER)
+
+    # Stage columns below path
+    stgs = list(stages or [])[:4]
+    n    = len(stgs)
+    if n:
+        col_w     = PATH_W / n
+        col_y_top = PATH_Y + Inches(0.48)
+        col_h     = CONTENT_Y + CONTENT_H - col_y_top
+        for i, stage in enumerate(stgs):
+            cx = PATH_X0 + i * col_w
+            # Colour accent bar at top of column
+            hairline(slide, cx, col_y_top,
+                     col_w - Inches(0.15), Emu(int(Pt(2))), ACC)
+            # Title
+            txt(slide, cx, col_y_top + Inches(0.10),
+                col_w - Inches(0.15), Inches(0.38),
+                str(stage.get("title", "")), sz=13, color=ACC,
+                bold=True, font=FONT_BODY)
+            # Body
+            txt(slide, cx, col_y_top + Inches(0.52),
+                col_w - Inches(0.15), col_h - Inches(0.52),
+                str(stage.get("body", "")), sz=11, color=INK,
+                font=FONT_BODY, anchor=MSO_ANCHOR.TOP)
     return slide

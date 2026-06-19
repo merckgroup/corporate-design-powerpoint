@@ -36,7 +36,7 @@ from ._ml_chrome import (
     _tracked, _track_letters, _format_section_number, _pad_int,
     _render_action_title, _source_line,
     statement_card, in_slide_section,
-    _takeaway_band, _superscript,
+    _takeaway_band, _superscript, _callout_block,
 )
 from ._ml_charts import (
     add_slope_chart, add_dot_plot, add_marimekko, add_waterfall,
@@ -404,6 +404,10 @@ def build_label_rows(prs, meta, action_title=None, rows=None, takeaway=None,
             rule_color = PURPLE_MUTED if _is_dark(style) else LIGHT_GRAY
             hairline(slide, Inches(0.65), ry + row_h + gap / 2 - Emu(int(Pt(0.5))),
                      Inches(12.0), Emu(int(Pt(0.5))), rule_color)
+    callout = (content or {}).get("callout")
+    if isinstance(callout, dict):
+        _callout_block(slide, callout.get("type", "conclusion"),
+                       callout.get("text", ""), pal)
     return slide
 
 

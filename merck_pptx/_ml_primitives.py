@@ -172,3 +172,49 @@ def _freeform_poly(slide, points, fill=None, border=None, border_w=None):
     return shp
 
 
+# ===========================================================================
+# Harvey Ball
+# ===========================================================================
+
+def draw_harvey_ball(slide, x, y, diameter, fill_pct,
+                     filled_color=None, empty_color=None, border_color=None):
+    """Draw a Harvey Ball indicator at (x, y) with the given diameter.
+
+    fill_pct: 0.0 = empty circle, 1.0 = completely filled circle.
+    All coordinates must be EMU integers (use Inches() to convert).
+    """
+    import math as _math
+    from ._ml_constants import MERCK_PURPLE, WHITE, LIGHT_GRAY
+    filled_color = filled_color if filled_color is not None else MERCK_PURPLE
+    empty_color  = empty_color  if empty_color  is not None else WHITE
+    border_color = border_color if border_color is not None else MERCK_PURPLE
+
+    r  = diameter / 2
+    cx = int(x + r)
+    cy = int(y + r)
+    R  = int(r)
+
+    # Background circle (the empty ring)
+    shp = oval(slide, x, y, diameter, diameter, fill=empty_color)
+    _apply_border(shp, border_color, Pt(1.5))
+
+    if fill_pct <= 0:
+        return shp
+
+    if fill_pct >= 1.0:
+        _apply_fill(shp, filled_color)
+        return shp
+
+    # Filled pie sector as freeform polygon
+    angle_start = -_math.pi / 2                              # 12 o'clock
+    angle_end   = angle_start + 2 * _math.pi * fill_pct
+    n_steps     = max(16, int(36 * fill_pct))
+    pts = [(cx, cy)]
+    for i in range(n_steps + 1):
+        a = angle_start + (angle_end - angle_start) * i / n_steps
+        pts.append((int(cx + R * _math.cos(a)), int(cy + R * _math.sin(a))))
+    pts.append((cx, cy))
+    sector = _freeform_poly(slide, pts, fill=filled_color)
+    return sector
+
+

@@ -52,7 +52,7 @@ from merck_pptx.merck_layouts import (
     build_comparison_table, build_score_table, build_influence_diagram,
     build_word_cloud, build_pyramid, build_venn, build_risk_heatmap,
     build_radar_chart, build_pros_cons, build_layered_stack,
-    build_photo_text,
+    build_photo_text, build_key_question, build_road_to_success,
 )
 from merck_pptx.validate_plan import validate_plan, ValidationError
 
@@ -1075,6 +1075,7 @@ def _build_arrow_chain(prs, meta, slide, total):
         source=slide.get("source"),
         subtitle=slide.get("subtitle"),
         methodology_note=c.get("methodology_note"),
+        content=c,
         **_common_kwargs(slide, meta, total),
     )
 
@@ -1256,6 +1257,7 @@ def _build_score_table(prs, meta, slide, total):
         rows=c.get("rows", []),          # schema keys: rows + scale
         scale=c.get("scale", 5),
         scale_label=c.get("scale_label"),
+        content=c,
         **_common_kwargs(slide, meta, total),
     )
 
@@ -1380,6 +1382,30 @@ def _build_fishbone(prs, meta, slide, total):
     )
 
 
+def _build_key_question(prs, meta, slide, total):
+    c = _content(slide)
+    return build_key_question(
+        prs, meta,
+        action_title=slide.get("action_title", ""),
+        question=c.get("question"),
+        context=c.get("context"),
+        content=c,
+        **_common_kwargs(slide, meta, total),
+    )
+
+
+def _build_road_to_success(prs, meta, slide, total):
+    c = _content(slide)
+    return build_road_to_success(
+        prs, meta,
+        action_title=slide.get("action_title", ""),
+        stages=c.get("stages"),
+        milestones=c.get("milestones"),
+        content=c,
+        **_common_kwargs(slide, meta, total),
+    )
+
+
 def _build_columns_auto(prs, meta, slide, total):
     """Auto-dispatch to two/three/four_column based on column count."""
     c = _content(slide)
@@ -1448,6 +1474,8 @@ _DISPATCH = {
     "layered_stack":      _build_layered_stack,
     "photo_text":         _build_photo_text,
     "fishbone":           _build_fishbone,
+    "key_question":       _build_key_question,
+    "road_to_success":    _build_road_to_success,
 }
 
 

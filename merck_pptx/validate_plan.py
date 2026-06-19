@@ -52,6 +52,9 @@ _VALID_LAYOUTS = frozenset({
     # Visual / story
     "hero_stat", "stat_strip", "pull_quote", "word_cloud",
     "pyramid", "venn", "layered_stack", "photo_text", "fishbone",
+    "key_question",
+    # Process extensions
+    "road_to_success",
 })
 
 _COUNT_WORDS = {

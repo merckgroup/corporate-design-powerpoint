@@ -1,5 +1,6 @@
 from __future__ import annotations
 import math
+import os
 import sys
 from typing import Optional
 from pptx.enum.shapes import MSO_SHAPE
@@ -7,7 +8,7 @@ from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Inches, Pt
 from ._ml_constants import (
-    FONT_HEAD, FONT_BODY,
+    FONT_HEAD, FONT_BODY, SLIDE_W, SLIDE_H,
     MERCK_PURPLE, MERCK_GOLD, MERCK_YELLOW, MERCK_BLUE, MERCK_AQUA,
     WHITE, INK_DARK, INK_GRAY, LIGHT_GRAY, PANEL_LIGHT,
     PURPLE_DEEP, PURPLE_MUTED, BAD_RED, GOOD_GREEN,
@@ -566,6 +567,72 @@ def build_fishbone(prs, meta, action_title=None, effect=None, bones=None,
                     "•  " + str(cause), sz=9, color=text_color,
                     font=FONT_BODY, align=PP_ALIGN.LEFT)
 
+    return slide
+
+
+# ===========================================================================
+# Layout: KEY QUESTION
+# ===========================================================================
+
+def build_key_question(prs, meta, action_title=None, question=None, context=None,
+                       takeaway="", source=None, subtitle=None,
+                       methodology_note=None, style="merck_executive",
+                       page=None, total=None, section_number=None,
+                       category=None, content=None):
+    """Centred question-mark icon with four directional arrows and question text.
+
+    content keys:
+        question (str) — the key question text
+        context  (str) — optional supporting context line
+    """
+    if content:
+        question = question or content.get("question")
+        context  = context  or content.get("context")
+    style = _style_or_promote(category, style)
+    pal   = _palette_for(style)
+    slide = _new_slide(prs, bg_color=pal["bg"])
+    apply_chrome(slide, meta, action_title, category=category,
+                 takeaway=takeaway, source=source, subtitle=subtitle,
+                 methodology_note=methodology_note,
+                 page=page, total=total, section_number=section_number,
+                 palette=style)
+
+    # Icon circle centred on slide
+    CX = SLIDE_W / 2
+    CY = Inches(3.30)
+    R  = Inches(0.60)
+    ACC = pal["accent"]
+    HOT = pal["hot"]
+
+    circle(slide, CX - R, CY - R, R * 2, fill=ACC)
+    txt(slide, CX - R, CY - R, R * 2, R * 2, "?",
+        sz=36, color=WHITE, bold=True, font=FONT_HEAD,
+        align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+
+    # Four directional arrows pointing toward the icon
+    AW, AH, GAP = Inches(0.50), Inches(0.28), Inches(0.18)
+    arrow_specs = [
+        (MSO_SHAPE.LEFT_ARROW,  CX - R - GAP - AW,  CY - AH / 2,  AW, AH),
+        (MSO_SHAPE.RIGHT_ARROW, CX + R + GAP,        CY - AH / 2,  AW, AH),
+        (MSO_SHAPE.UP_ARROW,    CX - AH / 2, CY - R - GAP - AW,   AH, AW),
+        (MSO_SHAPE.DOWN_ARROW,  CX - AH / 2, CY + R + GAP,         AH, AW),
+    ]
+    for shape_type, ax, ay, aw, ah in arrow_specs:
+        shp = slide.shapes.add_shape(shape_type,
+                                     int(ax), int(ay), int(aw), int(ah))
+        shp.shadow.inherit = False
+        _apply_fill(shp, HOT)
+        _apply_border(shp, None)
+
+    # Question text
+    if question:
+        txt(slide, Inches(1.5), CY + R + Inches(0.50), Inches(10.33), Inches(0.70),
+            str(question), sz=22, color=pal["ink"], bold=True, font=FONT_HEAD,
+            align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.TOP)
+    if context:
+        txt(slide, Inches(2.0), CY + R + Inches(1.30), Inches(9.33), Inches(0.50),
+            str(context), sz=13, color=pal["ink_2"], font=FONT_BODY,
+            align=PP_ALIGN.CENTER)
     return slide
 
 
