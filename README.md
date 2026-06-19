@@ -12,9 +12,16 @@ python -m merck_pptx generate brief.md output/deck.pptx --defaults
 python -m merck_pptx build plan.json output/deck.pptx
 ```
 
-> **Installation and setup:** see [SETUP.md](SETUP.md).  
-> **Brand & design rules:** [Merck_Presentation_Guidelines.md](Merck_Presentation_Guidelines.md) — authoritative reference for colors, fonts, shapes, and accessibility.  
-> **How to use the pipeline:** [Merck_Presentation_Helper.md](Merck_Presentation_Helper.md) — practical guide for choosing layouts, writing plans, and avoiding common mistakes.
+> **Installation and setup:** [SETUP.md](SETUP.md)
+>
+> **Four documents, four audiences — pick the right one:**
+>
+> | Document | Read this when… |
+> |---|---|
+> | **You are here — `README.md`** | You need the full technical reference: CLI commands, Python API, meta fields, template selection logic, and the complete layout catalog with every content key. |
+> | [**Merck_Presentation_Helper.md**](Merck_Presentation_Helper.md) | You are a human building a deck: which layout to pick for your content type, what the most common schemas look like, color do's and don'ts, and the pre-send checklist. Faster to scan than README. |
+> | [**Merck_Presentation_Guidelines.md**](Merck_Presentation_Guidelines.md) | You need to understand or enforce the Merck Corporate Design rules: exact color values, typography rules, shape geometry, accessibility requirements, the six color theme specifications, and the full brand governance checklist. Authoritative on *why* things look the way they do. |
+> | [**LLM_PLAN_GUIDE.md**](LLM_PLAN_GUIDE.md) | You are an LLM generating a `plan.json`. Contains the complete JSON schema for all 46 layouts, quality rules, pacing guidelines, layout selection guide, and character limits. Not optimised for human reading. |
 
 ---
 
@@ -328,6 +335,8 @@ For the highest-impact slides (Executive Summary, Recommendation, Decision Reque
 
 46 layouts across two tiers. The **default** catalog covers everyday consulting decks. Set `variety_mode: "creative"` in meta to unlock the full set.
 
+> **Note on Merck branded visual assets (Mercrobes, etc.):** Some empower library elements — including the 3D organic sphere icons ("Mercrobes") used in empower's "Transformation process" slides — exist only on the empower server and are not part of this pipeline. The pipeline generates all shapes programmatically using python-pptx; it does not embed empower-managed OLE objects or server-side assets. The four empower icons cached locally (`c4b37bab`, `d8ea713b`, `e5ef0615`, `ed4f5f74`) are not automatically inserted — they are available for manual use in PowerPoint after generation.
+
 ### Cover and navigation
 
 | Layout | Use for |
@@ -350,7 +359,7 @@ For the highest-impact slides (Executive Summary, Recommendation, Decision Reque
 | `radar_chart` | Multi-axis capability or maturity spider (4–8 axes, 0–100) |
 | `risk_heatmap` | 5×5 probability × impact grid with numbered dots |
 | `kpi_dashboard` | 4–6 metrics with RAG dots and optional sparklines |
-| `score_table` | Filled-dot maturity ratings on a 1–5 scale |
+| `score_table` | Filled-dot maturity ratings on a 1–5 scale; or Harvey Ball indicators when `rating_type: "harvey"` is set (score 0.0–1.0) |
 | `word_cloud` | Survey verbatims, topic frequency (weight 1–5) |
 
 ### Argument and structure
@@ -362,7 +371,7 @@ For the highest-impact slides (Executive Summary, Recommendation, Decision Reque
 | `four_column` | Four parallel workstreams |
 | `columns` | Auto-dispatches to 2/3/4-column by the number of items you provide |
 | `vertical_numbered` | 3–5 numbered action items |
-| `label_rows` | Named barriers or root-cause taxonomy (3–6 rows) |
+| `label_rows` | Named barriers or root-cause taxonomy (3–6 rows); optional conclusion/result callout at bottom |
 | `before_after` | Side-by-side comparison with gold directional arrow |
 | `pros_cons` | Green pros panel vs red cons panel |
 | `2x2_matrix` | Quadrant analysis — effort × impact, risk × value, etc. |
@@ -375,15 +384,16 @@ For the highest-impact slides (Executive Summary, Recommendation, Decision Reque
 | `gantt` | Multi-row timeline across quarters |
 | `milestone_timeline` | Chronological event sequence with status dots |
 | `circular_flow` | Continuous loop — Plan/Do/Check/Act etc. (2–8 phases) |
-| `arrow_chain` | Causal chain: Trigger → Response → Effect → Outcome + consequence box |
+| `arrow_chain` | Causal chain: Trigger → Response → Effect → Outcome + optional conclusion callout |
 | `funnel` | Multiple inputs converging to one outcome |
 | `journey_map` | Multi-actor swim-lane: phases across the top, actors down the side |
+| `road_to_success` | Horizontal timeline path with milestone dots + 2–4 stage columns below |
 
 ### Decisions and tables
 
 | Layout | Use for |
 |---|---|
-| `decision_rows` | Decision log: number, title, description, owner, tone (max 5) |
+| `decision_rows` | Decision log: number, title, description, owner, tone (max 5); optional conclusion/result/next/future callout at bottom |
 | `status_table` | RAG status table — RISK / STATUS / HEALTH column auto-detected |
 | `comparison_table` | Feature matrix: options across the top, features down the side; yes / no / partial |
 
@@ -402,6 +412,7 @@ For the highest-impact slides (Executive Summary, Recommendation, Decision Reque
 | Layout | Use for |
 |---|---|
 | `pull_quote` | Full-bleed hero quote or vision statement |
+| `key_question` | Centred discussion-framing slide: `?` icon with four arrows, question text, optional context line |
 | `pyramid` | Strategy hierarchy or value tiers (3–5 tiers, `"up"` or `"down"`) |
 | `venn` | Overlap of 2–3 audiences or capabilities |
 | `layered_stack` | Technology architecture or platform layers (up to 7) |
@@ -450,12 +461,13 @@ The complete field-by-field schema for all 46 layouts — including content payl
 
 ## Design Guidelines
 
-Both documents live at the root of this repository:
+Three companion documents live at the root of this repository:
 
-| Document | Purpose |
-|---|---|
-| [Merck_Presentation_Guidelines.md](Merck_Presentation_Guidelines.md) | Complete Merck Corporate Design rules: color palette, typography, visual styles, six color themes, 44 layout keys, shape rules, accessibility checklist, and pre-publish checklist. Authoritative reference for any design decision. |
-| [Merck_Presentation_Helper.md](Merck_Presentation_Helper.md) | Practical user guide: how to choose region / style / theme, section number rules, layout picker table, content schemas for the most common layouts, color do's and don'ts, and a pre-send checklist. |
+| Document | Purpose | Go here when… |
+|---|---|---|
+| [Merck_Presentation_Guidelines.md](Merck_Presentation_Guidelines.md) | Complete Merck Corporate Design rules: exact hex values, typography rules, shape geometry, accessibility requirements, and brand governance. | You need to understand *why* a design decision was made, verify a color hex, or check the accessibility rules for a specific element. |
+| [Merck_Presentation_Helper.md](Merck_Presentation_Helper.md) | Practical human guide: layout picker table, example content schemas for the most-used layouts, color do's and don'ts, pre-send checklist. | You are building a deck and need to quickly choose a layout, check a content schema, or run a pre-send quality check. Faster to scan than README. |
+| [LLM_PLAN_GUIDE.md](LLM_PLAN_GUIDE.md) | LLM reference: all 46 layout JSON schemas, character limits, item count caps, layout selection guide, pacing rules, aliases. | An LLM is generating a `plan.json`. Contains the complete contract between the LLM and the rendering engine. |
 
 ### Quick design reference
 

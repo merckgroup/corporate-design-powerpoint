@@ -1,7 +1,15 @@
 # Merck Presentation Builder — User Guide
 
-> A practical helper for creating Merck Corporate Design-compliant presentations with the pipeline.  
-> For full technical rules see `Merck_Presentation_Guidelines.md`. For API/CLI reference see `README.md`.
+> A practical helper for creating Merck Corporate Design-compliant presentations with the pipeline.
+>
+> **This document is for humans building a deck.** It is deliberately concise — use it to make layout decisions, check common content schemas, and run the pre-send checklist.
+>
+> | Need | Go to |
+> |---|---|
+> | Which layout to use, content schemas, pre-send checklist | **You are here** |
+> | CLI commands, Python API, full layout catalog with every key | `README.md` |
+> | Exact color rules, typography, accessibility, brand governance | `Merck_Presentation_Guidelines.md` |
+> | Complete JSON schema for all 46 layouts (for LLM use) | `LLM_PLAN_GUIDE.md` |
 
 ---
 
@@ -138,13 +146,14 @@ The `action_title` field is the punchy one-line takeaway at the top of each slid
 | Layout | Use when |
 |---|---|
 | `phase_process` | Sequential phases/stages (max 5) |
-| `arrow_chain` | Linear connected steps |
+| `arrow_chain` | Linear connected steps with optional conclusion callout |
 | `milestone_timeline` | Timeline with dated milestones |
 | `gantt` | Project plan with quarters |
-| `decision_rows` | Decisions/recommendations with owner (max 5) |
+| `decision_rows` | Decisions/recommendations with owner (max 5); optional conclusion callout |
 | `circular_flow` | Repeating/cyclical process |
 | `funnel` | Narrowing stages |
 | `waterfall_slide` | Cascading / waterfall steps |
+| `road_to_success` | Transformation roadmap: horizontal path + milestones + 2–4 stage columns |
 | `fishbone` | Cause-and-effect (Ishikawa) |
 
 ### Data & Charts
@@ -156,7 +165,7 @@ The `action_title` field is the punchy one-line takeaway at the top of each slid
 | `hero_stat` | Single prominent number with context |
 | `stat_strip` | Row of 3–4 statistics |
 | `status_table` | RAG status table |
-| `score_table` | Scoring matrix |
+| `score_table` | Scoring matrix (dot-filled 1–5 scale, or Harvey Ball 0.0–1.0 with `rating_type: "harvey"`) |
 | `comparison_table` | Feature comparison |
 | `risk_heatmap` | Likelihood × impact matrix |
 | `radar_chart` | Multi-axis comparison |
@@ -177,6 +186,7 @@ The `action_title` field is the punchy one-line takeaway at the top of each slid
 | `org_chart` | Organizational hierarchy |
 | `photo_text` | Large image with text |
 | `layered_stack` | Architecture / technology stack |
+| `key_question` | Frame a discussion or decision question visually |
 
 ---
 
@@ -264,11 +274,19 @@ The `action_title` field is the punchy one-line takeaway at the top of each slid
   "layout": "decision_rows",
   "content": {
     "decisions": [
-      { "tone": "positive", "number": 1, "owner": "CMO", "text": "Approve budget increase" }
-    ]
+      {"number": 1, "title": "Approve budget increase",
+       "desc": "€12M incremental for FY2026 — budget sign-off required by 30 June",
+       "owner": "CFO", "tone": "positive"},
+      {"number": 2, "title": "Defer EU launch",
+       "desc": "Delay to Q2 2027 pending trial readout data",
+       "owner": "CMO", "tone": "neutral"}
+    ],
+    "callout": {"type": "conclusion", "text": "All three approvals needed before Q3 planning lock"}
   }
 }
+// CANONICAL keys: title + desc (desc ≤160 chars). Never use "text" as the only body key.
 // tone: "positive" | "negative" | "neutral" — Max 5 decisions
+// callout is optional: type = "conclusion" | "result" | "next" | "future"
 ```
 
 ### `phase_process`
@@ -278,11 +296,14 @@ The `action_title` field is the punchy one-line takeaway at the top of each slid
   "content": {
     "show_arrows": true,
     "phases": [
-      { "label": "01", "title": "Discovery", "body": "Research phase", "highlighted": false }
+      {"label": "01", "title": "Discovery",  "body": "Research phase",       "status": "done"},
+      {"label": "02", "title": "Design",     "body": "Co-creation workshops","status": "current"},
+      {"label": "03", "title": "Deploy",     "body": "Pilot in 3 markets",   "status": "future"}
     ]
   }
 }
-// Max 5 phases
+// status: "done" | "current" | "future"  (use status, not the deprecated highlighted: bool)
+// Max 5 phases; body ≤100 chars per phase
 ```
 
 ### `hero_stat`
@@ -309,6 +330,51 @@ The `action_title` field is the punchy one-line takeaway at the top of each slid
     ]
   }
 }
+```
+
+### `road_to_success`
+```jsonc
+{
+  "layout": "road_to_success",
+  "content": {
+    "stages": [
+      {"title": "Discover", "body": "Map current state and identify pain points"},
+      {"title": "Build",    "body": "Prototype and validate with stakeholders"},
+      {"title": "Scale",    "body": "Full rollout — Q4 target"}
+    ],
+    "milestones": ["Kick-off", "Sprint 1", "Pilot", "Launch"]
+  }
+}
+// stages: 2–4; milestones: 2–6 (omit for a clean path without labels)
+```
+
+### `key_question`
+```jsonc
+{
+  "layout": "key_question",
+  "section_number": null,
+  "content": {
+    "question": "Should we scale now or strengthen the foundation first?",
+    "context":  "Decision required before Q3 planning cycle"
+  }
+}
+// Use to visually frame a decision before decision_rows or before_after slides.
+```
+
+### `score_table` with Harvey Ball
+```jsonc
+{
+  "layout": "score_table",
+  "content": {
+    "rating_type": "harvey",
+    "rows": [
+      {"label": "Customer Satisfaction", "score": 0.75, "note": "Above target"},
+      {"label": "Cost Efficiency",        "score": 0.50, "note": "On track"},
+      {"label": "Innovation Pipeline",    "score": 0.25, "note": "Needs focus"}
+    ]
+  }
+}
+// score: 0.0 (empty circle) to 1.0 (full circle) — fraction, not integer
 ```
 
 ---
@@ -366,6 +432,9 @@ The pipeline applies all fonts automatically. For reference:
 | More than 5 items in exec_summary | Truncated silently | Keep to ≤ 5 key messages |
 | More than 5 decisions in decision_rows | Truncated silently | Keep to ≤ 5 rows |
 | More than 5 phases in phase_process | Truncated silently | Keep to ≤ 5 phases |
+| `decision_rows` with `"text"` as only body key | Body renders empty | Use `"title"` + `"desc"` (canonical) |
+| `phase_process` with `"highlighted": true` | Deprecated — ignored | Use `"status": "current"` |
+| `score_table` Harvey Ball with integer score | Score ignores scale — renders 0% | Use float 0.0–1.0 with `rating_type: "harvey"` |
 | Using `color_theme` for content slides | Theme is cover/divider only | Theme does not change body slide colors |
 | Embedding Excel tables in charts | Bloats file, exposes hidden data | Use `chart_slide` layout with JSON data |
 
@@ -399,8 +468,8 @@ Before sharing a generated deck, verify:
 
 | Question | Where to look |
 |---|---|
-| Full design rules (colors, fonts, shapes) | `Guidelines/Merck_Presentation_Guidelines.md` |
-| CLI commands and API reference | `README.md` |
-| Plan JSON schema details | `CLAUDE.md` (Plan JSON schema section) |
+| Full design rules (colors, fonts, shapes) | `Merck_Presentation_Guidelines.md` |
+| CLI commands, Python API, full layout catalog | `README.md` |
+| Complete JSON schema for all 46 layouts | `LLM_PLAN_GUIDE.md` |
 | Branding questions | branding@merckgroup.com |
 | Brand Hub | https://brandhub.merckgroup.com |

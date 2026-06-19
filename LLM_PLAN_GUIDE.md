@@ -211,14 +211,14 @@ Move supporting detail (methodology, data tables, backup analysis) to appendix s
 
 Layout families for pacing purposes:
 - **Text/list:** `two_column`, `three_column`, `four_column`, `vertical_numbered`, `label_rows`, `topic_set`
-- **Process/timeline:** `phase_process`, `arrow_chain`, `circular_flow`, `gantt`, `milestone_timeline`, `funnel`, `journey_map`
+- **Process/timeline:** `phase_process`, `arrow_chain`, `circular_flow`, `gantt`, `milestone_timeline`, `funnel`, `journey_map`, `road_to_success`
 - **Chart/data:** `chart_slide`, `waterfall_slide`, `donut_chart`, `radar_chart`, `kpi_dashboard`, `stat_strip`, `hero_stat`
 - **Decision/analysis:** `decision_rows`, `before_after`, `2x2_matrix`, `comparison_table`, `pros_cons`, `risk_heatmap`
-- **Visual/story:** `pull_quote`, `word_cloud`, `pyramid`, `venn`, `icon_grid`, `fishbone`
+- **Visual/story:** `pull_quote`, `word_cloud`, `pyramid`, `venn`, `icon_grid`, `fishbone`, `key_question`
 
 ---
 
-## 9. All 44 layouts — content schemas
+## 9. All 46 layouts — content schemas
 
 Every `content` field is an object. All keys shown are read from `content` unless noted as
 a slide-level field (e.g., `action_title`, `takeaway`, `source` live at the slide root, not in content).
@@ -391,10 +391,12 @@ dispatches to two/three/four_column based on `columns` array length.
       {"label": "Objective",   "body": "Grow market share to 35% by FY2027"},
       {"label": "Constraint",  "body": "Budget capped at €12M"}
     ],
-    "label_color": null   // Optional hex or theme color for label strip
+    "label_color": null,    // Optional hex or theme color for label strip
+    "callout": {"type": "next", "text": "Three decisions are required to proceed"}
   }
 }
 // body ≤130 chars per row
+// callout is optional — same type/text schema as decision_rows callout
 ```
 
 #### `topic_set`
@@ -716,6 +718,22 @@ Use `waterfall_slide` (not `chart_slide`) for revenue bridges, cost waterfalls, 
 // note ≤80 chars
 ```
 
+**Harvey Ball variant** — set `rating_type: "harvey"` for consulting-style pie indicators.
+Score is a fraction from 0.0 (empty) to 1.0 (fully filled). Scale and scale_label are ignored.
+```jsonc
+{
+  "layout": "score_table",
+  "content": {
+    "rating_type": "harvey",
+    "rows": [
+      {"label": "Customer Satisfaction", "score": 0.75, "note": "Above target"},
+      {"label": "Cost Efficiency",        "score": 0.50, "note": "On track"},
+      {"label": "Innovation Pipeline",    "score": 0.25, "note": "Needs focus"}
+    ]
+  }
+}
+```
+
 ---
 
 ### Process & timeline layouts
@@ -800,10 +818,12 @@ Use `waterfall_slide` (not `chart_slide`) for revenue bridges, cost waterfalls, 
       {"label": "Analyse",   "body": "Root cause analysis",         "highlighted": true},
       {"label": "Solve",     "body": "Develop solution options",   "highlighted": false}
     ],
-    "consequence": {"label": "Outcome", "body": "Sustainable OEE gain"}
+    "consequence": {"label": "Outcome", "body": "Sustainable OEE gain"},
+    "callout": {"type": "result", "text": "Expected saving: €2.4M annually"}
   }
 }
 // consequence is optional; highlighted: true adds visual emphasis
+// callout is optional — same type/text schema as decision_rows callout
 ```
 
 #### `funnel`
@@ -886,13 +906,19 @@ Use `waterfall_slide` (not `chart_slide`) for revenue bridges, cost waterfalls, 
     "decisions": [
       {"number": 1, "title": "Approve budget increase", "desc": "Increase R&D budget by €12M for FY2026 ≤160 chars", "owner": "CFO", "tone": "positive"},
       {"number": 2, "title": "Defer market entry",       "desc": "Delay EU launch to Q2 2027 pending trial data",     "owner": "CMO", "tone": "neutral"}
-    ]
+    ],
+    "callout": {
+      "type": "conclusion",
+      "text": "Recommend Option 1 — decision required by 30 June"
+    }
   }
 }
 // CANONICAL keys: "title" + "desc"  (desc ≤160 chars)
 // "body" and "description" are also accepted as aliases for "desc"
 // tone: "positive" | "negative" | "neutral"
 // max 5 decisions
+// callout is optional — renders a branded pill above the footer
+// callout.type: "conclusion" (>>) | "result" (↓) | "next" (→) | "future" (✓)
 ```
 
 #### `before_after`
@@ -1101,6 +1127,44 @@ Use `waterfall_slide` (not `chart_slide`) for revenue bridges, cost waterfalls, 
 // Allowed extensions: .png .jpg .jpeg .gif .bmp .tiff .webp .emf .wmf
 ```
 
+#### `key_question`
+```jsonc
+{
+  "layout": "key_question",
+  "section_number": null,
+  "content": {
+    "question": "Should we scale operations now or invest in infrastructure first?",
+    "context":  "Decision required before Q3 planning — impacts budget allocation"
+  }
+}
+// Renders: centred circle (?) icon with four directional arrows pointing in,
+//          large question text below, smaller context line below that.
+// Use as a discussion-framing slide before a decision_rows or before_after slide.
+// section_number: null recommended (structural framing slide)
+// question ≤200 chars; context ≤130 chars
+```
+
+#### `road_to_success`
+```jsonc
+{
+  "layout": "road_to_success",
+  "content": {
+    "stages": [
+      {"title": "Discover",  "body": "Map current state and identify key pain points across the organisation"},
+      {"title": "Build",     "body": "Prototype and validate with stakeholders in three agile sprints"},
+      {"title": "Scale",     "body": "Full rollout with change management programme — Q4 target"}
+    ],
+    "milestones": ["Kick-off", "Sprint 1", "Pilot", "Review", "Launch"]
+  }
+}
+// Renders: horizontal accent line (the "road") spanning the slide,
+//          small dot per milestone (labels alternate above/below the line),
+//          2–4 stage columns with accent subheadline + body text below the road.
+// stages: 2–4 items; body ≤130 chars
+// milestones: 2–6 short label strings (≤20 chars each); omit for clean timeline
+// Use for transformation roadmaps, implementation plans, go-to-market journeys.
+```
+
 ---
 
 ### Additional image placement (any layout)
@@ -1265,6 +1329,7 @@ Use this table to choose the right layout for your content. When in doubt, prefe
 | Multi-workstream schedule over quarters | `gantt` | Columns = quarters; rows = workstreams |
 | Many inputs converging to one output | `funnel` | Use `inputs` (not "stages") |
 | Root cause analysis | `fishbone` | Effect + bones (categories) + causes |
+| Transformation or implementation roadmap with named milestones | `road_to_success` | 2–4 stages + 2–6 milestone labels |
 
 ### Comparisons and options
 
@@ -1316,6 +1381,7 @@ Use this table to choose the right layout for your content. When in doubt, prefe
 | Priority or importance hierarchy | `pyramid` | orientation: up (base = foundation) or down (base = outcome) |
 | 2–3 overlapping concepts with shared zone | `venn` | Key: intersection, not overlap |
 | Opening impactful statement or attributed quote | `pull_quote` | section_number: null |
+| Discussion framing or key decision question | `key_question` | Use before decision_rows or before_after; section_number: null recommended |
 | Word frequency or theme visualization | `word_cloud` | weight 1–5 |
 | Photo with bullet context | `photo_text` | image must be in project directory |
 | Key messages for C-suite or board | `exec_summary` | Max 5 messages; section_number: null |
@@ -1357,6 +1423,9 @@ These mistakes produce silently empty or broken slides — no error is raised:
 | `section_divider` | chapter number in `section_number` | chapter number in `content.number` |
 | `icon_grid` | named icon string (e.g. `"target"`) | emoji string (e.g. `"🎯"`) |
 | `topic_set` | emoji string (e.g. `"🎯"`) as icon | named icon string (e.g. `"target"`) |
+| `score_table` Harvey Ball | `score: 4` (integer out of scale) | `score: 0.75` (float 0.0–1.0) when `rating_type: "harvey"` |
+| `road_to_success` | `"stages"` containing phases without `title`/`body` | `stages: [{title, body}]` |
+| callout (decision_rows etc.) | `callout.type: "done"` or `"check"` | `type` must be `"conclusion"` / `"result"` / `"next"` / `"future"` |
 
 ---
 
