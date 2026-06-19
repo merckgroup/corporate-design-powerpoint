@@ -73,7 +73,7 @@ _VALID_COLOR_THEMES       = frozenset({
     "functional", "organic", "plastic", "synthetic", "technical", "electronics",
 })
 _VALID_DIVISIONS          = frozenset({
-    "merck", "emd_serono", "emd_electronics", "millipore_sigma", "merck_asia",
+    "merck", "emd_serono", "emd_electronics", "millipore_sigma", "merck_asia", "usa",
 })
 _VALID_REGIONS            = frozenset({"eu", "usa"})
 _VALID_DECK_STYLES        = frozenset({

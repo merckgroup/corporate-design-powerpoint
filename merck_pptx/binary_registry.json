@@ -1,11 +1,51 @@
 {
-  "_comment": "Maps (division, color_theme) to empower BinaryFile UID. Run 'python -m merck_pptx discover-templates' to find and register additional UIDs for other divisions.",
+  "_comment": "Maps (division, color_theme) to empower BinaryFile UID. All 62 full-featured BinaryFiles catalogued via vision AI on thumbnails. Run 'python -m merck_pptx discover-templates' to explore further.",
   "merck": {
+    "_note": "Merck Healthcare KGaA — EU/global branding",
     "plastic":     "3602214c-15c6-4132-a2c7-eadbbb3c1279",
     "functional":  "d1c34b6f-9d6d-4de0-b97f-81d093db01b7",
     "organic":     "131b853d-e559-4bad-b753-ac7735622df6",
     "synthetic":   "651fa373-badd-452b-a208-4a55f7596717",
     "technical":   "b46b3c65-5eac-4c24-99bd-6dd953e7bcad",
     "electronics": "355a4c87-ee66-42c4-91e1-8d7f683c6c62"
+  },
+  "merck_asia": {
+    "_note": "Merck 默克 — Asia/China branding",
+    "plastic":     "17a6ddad-affd-4a84-bacc-4bf9c7d85ba4",
+    "functional":  "fea19808-5d33-4c27-b1b4-add2c61a43e2",
+    "organic":     "55b7e121-96ad-420c-9e0d-5ed6737881d6",
+    "synthetic":   "7daf0427-2e53-427c-8fd0-ed790864b69c",
+    "technical":   "1be74e10-128d-432a-b1e7-4c040ef4b78c"
+  },
+  "emd_serono": {
+    "_note": "EMD Serono — USA/Canada Healthcare branding",
+    "plastic":     "bf9ef31e-3377-47f9-b7c5-5da99912b0b7",
+    "functional":  "a45e5bcf-5a2a-40a0-9e71-6158e1194768",
+    "organic":     "5f6db7af-d282-44fa-9d6e-8a5dc5db560a",
+    "synthetic":   "5efe91a9-680c-4441-a0e1-b6cdbf20c16b",
+    "technical":   "ca3dc492-be2e-4f70-97f6-729a95e5a848"
+  },
+  "millipore_sigma": {
+    "_note": "MilliporeSigma — USA/Canada Life Science branding",
+    "plastic":     "288c0977-32ee-4c43-80ca-f786618eb5ac",
+    "functional":  "39d3143b-ae90-4ab9-897f-118c98c95ce3",
+    "organic":     "d4cd1f70-697e-4a36-9d7a-8a66542894f5",
+    "synthetic":   "abf187b6-a668-43c7-9041-b021ec4a3903",
+    "technical":   "04f77439-bd9a-4d6e-9962-8e991c6117fa"
+  },
+  "emd_electronics": {
+    "_note": "EMD Electronics — USA/Canada Electronics branding",
+    "plastic":     "97317d69-b172-4e0e-a676-6c30cc40c6a4",
+    "functional":  "f0157f9e-833a-4d6e-a7b4-7f91d390a0f8",
+    "organic":     "5c367b0e-115f-42d1-8d35-06b67321e956",
+    "technical":   "f108e07b-3a26-4e15-9c2f-399a61d9c734"
+  },
+  "usa": {
+    "_note": "USA/Canada tri-brand (EMD Serono + MilliporeSigma + EMD Electronics) — use for cross-business US presentations",
+    "plastic":     "c132f68f-422a-4f5c-bfa9-387d2a5279c5",
+    "functional":  "1bdea49d-39f9-4902-8e3e-24c62dc779b6",
+    "organic":     "874a5eaa-6d88-460e-ad0a-f6fb3d2354f5",
+    "synthetic":   "e67984a5-c517-4a81-8ec9-4a3754075f7a",
+    "technical":   "f6bc4d9c-67c2-49cb-a88b-58447417caa9"
   }
 }
