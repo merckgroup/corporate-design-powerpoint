@@ -843,9 +843,13 @@ def build_icon_grid(prs, meta, action_title=None, items=None,
                       icon_cx + margin, icon_cy + margin,
                       icon_sz - margin * 2, color=WHITE)
         else:
-            # Fallback: render as emoji / short text
+            # Fallback: only render the value as text when it is a single
+            # emoji or ≤2-char symbol.  Longer strings are internal icon-key
+            # names that the LLM invented; rendering them overflows the small
+            # circle, so substitute a neutral dot instead.
+            is_short_symbol = icon_name and len(icon_name.strip()) <= 2
             txt(slide, icon_cx, icon_cy, icon_sz, icon_sz,
-                icon_name or "●",
+                (icon_name.strip() if is_short_symbol else "●"),
                 sz=18, color=WHITE, font=FONT_BODY,
                 align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
         txt(slide,

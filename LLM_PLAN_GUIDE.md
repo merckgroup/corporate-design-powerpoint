@@ -39,10 +39,22 @@ has multiple sections; omit for single-topic decks.
     "variety_mode":    "default",         // Optional. "default" | "creative"
     "show_disclaimer": false,             // Optional. Show legal disclaimer footer text.
     "division":        "merck",           // Optional. Controls template file (see §7).
-    "cover_top_bar":   false              // Optional. Show a colored bar at top of cover.
+    "cover_top_bar":   false,             // Optional. Show a colored bar at top of cover.
+    "chrome": {                           // Optional. Opt-in custom chrome (all default false).
+      "progress_bar":         false,      //   Proportional fill strip at top of content slides.
+      "section_circles":      false,      //   Numbered purple circles + category tag (top-left).
+      "takeaway_bands":       false,      //   Purple takeaway band above footer. LLM writes
+                                          //   takeaway text ONLY when this is true.
+      "footer_breadcrumb":    false,      //   "Deck Label • Category" left footer text.
+      "classification_badge": false       //   "Classification: INTERNAL" badge top-right.
+                                          //   Not present in standard empower layouts.
+    }
   }
 }
 ```
+
+> **Default is standard empower.** Without `chrome` (or with all flags `false`), the output contains only the Merck logo, classification badge, and page number — matching the standard empower template. Set flags to `true` individually to add each element.
+
 
 ### `region`
 | Value | Legal footer | Template |
@@ -71,7 +83,7 @@ Selects the divisional template. Omit unless the deck targets a specific Merck d
   "page":           1,                    // 1-indexed. Auto-renumbered by pipeline.
   "page_function":  "Evidence",           // See §4 for valid values.
   "layout":         "two_column",         // One of the 44 layout keys (see §9).
-  "action_title":   "Sales grew 18% YoY; digital led the gain",  // ≤80 chars
+  "action_title":   "Sales grew 18% YoY; digital led the gain",  // ≤120 chars (60 for cover)
   "section_number": 3,                    // integer or null (see §8)
   "style":          "inherit",            // "inherit" | "merck_executive" | "merck_corporate" | "merck_storytelling"
   "category":       "EVIDENCE",           // UPPERCASE tag (free text). Auto-promote trigger (see §5).
@@ -101,10 +113,11 @@ Risk | Tradeoff
 
 ## 4. Action titles and takeaways
 
-### `action_title` (≤80 chars)
+### `action_title` (≤120 chars, ≤60 for cover)
 - Must be a **declarative sentence**, never a noun phrase.
 - Preferred pattern: `"INSIGHT; CONSEQUENCE"` (semicolon-separated).
 - Use numbers over adjectives: `"OEE improved 5.4 pts to 84%"` not `"OEE improved significantly"`.
+- Never truncate with `…` unless the source heading itself exceeds 120 chars.
 - Cover slides: use `"Deck Title; Department subtitle"` (semicolon separates title from department).
 - Cover action_title is truncated to 60 chars — keep it shorter.
 
@@ -279,7 +292,9 @@ a slide-level field (e.g., `action_title`, `takeaway`, `source` live at the slid
 ```jsonc
 {
   "layout": "section_divider",
-  "action_title": "Chapter Title",  // slide-level — the divider heading text
+  "action_title": "Chapter Title",  // slide-level — the chapter heading ONLY, ≤40 chars
+                                    // Good: "Results"  Bad: "Results: Candidate Pairs Found"
+                                    // Do NOT include slide topic, a colon prefix, or sub-heading
   "section_number": null,            // always null — structural slide
   "content": {
     "number": "01"                   // the large chapter number displayed on the divider
@@ -289,6 +304,7 @@ a slide-level field (e.g., `action_title`, `takeaway`, `source` live at the slid
 ```
 > `content.number` drives the large decorative number on the divider.
 > `section_number` stays null (section_divider is a structural slide).
+> `action_title` must be the chapter heading only — ≤40 chars, no colon-separated subtitle.
 
 #### `close`
 ```jsonc
@@ -311,13 +327,21 @@ a slide-level field (e.g., `action_title`, `takeaway`, `source` live at the slid
 {
   "layout": "two_column",
   "content": {
-    "left":  {"label": "Current state", "body": "Paragraph text", "tone": "neutral", "items": ["Point 1", "Point 2"]},
-    "right": {"label": "Future state",  "body": "Paragraph text", "tone": "positive", "items": ["Point 1"]}
+    "left":  {"label": "Current state", "body": "Paragraph text ≤300 chars", "tone": "neutral", "items": ["Point 1", "Point 2"]},
+    "right": {"label": "Future state",  "body": "Paragraph text ≤300 chars", "tone": "positive", "items": ["Point 1"]}
   }
 }
+// Use for EXACTLY 2 items side by side. NEVER for 4 items — use 2x2_matrix instead.
 // tone: "positive" | "negative" | "neutral" — colors the label strip
-// items and body are both optional; use one or both
+// items and body are both optional; use one or both (NEVER put same content in both)
 ```
+
+**Column card field rules (apply to two_column, three_column, four_column, columns):**
+- `label` = column header shown in the bar (e.g. "STEP 1", "THE PROBLEM")
+- `body` = bold hero sentence — the key claim or step subtitle (1–2 sentences, ≤300 chars)
+- `items` = sub-bullet details EXPANDING on body (≤120 chars each); omit when body is self-contained
+- **NEVER put the same content in both `body` AND `items`** — both render visibly on the slide
+- Cross-cutting bullets (apply to all columns, not one): add a final `"Key Points"` column with `items[]` rather than using `takeaway` (takeaway is a single short line, not a multi-bullet list)
 
 #### `three_column`
 ```jsonc
@@ -388,14 +412,15 @@ dispatches to two/three/four_column based on `columns` array length.
   "layout": "label_rows",
   "content": {
     "rows": [
-      {"label": "Objective",   "body": "Grow market share to 35% by FY2027"},
+      {"label": "Objective",   "body": "Grow market share to 35% by FY2027", "color": "teal"},
       {"label": "Constraint",  "body": "Budget capped at €12M"}
     ],
-    "label_color": null,    // Optional hex or theme color for label strip
+    "label_color": null,    // Optional hex or theme color for ALL label strips (global)
     "callout": {"type": "next", "text": "Three decisions are required to proceed"}
   }
 }
-// body ≤130 chars per row
+// body ≤300 chars per row (full prose description is allowed)
+// per-row color (optional): "gray" | "teal" | "blue" | "green" | "yellow" | "orange" | "red" | "pink" | "purple"
 // callout is optional — same type/text schema as decision_rows callout
 ```
 
@@ -832,14 +857,15 @@ Score is a fraction from 0.0 (empty) to 1.0 (fully filled). Scale and scale_labe
   "layout": "funnel",
   "content": {
     "inputs": [
-      {"label": "Awareness",    "body": "12,000 leads"},
-      {"label": "Engagement",   "body": "4,800 qualified"},
-      {"label": "Conversion",   "body": "960 trials"}
+      {"label": "Awareness",    "body": "12,000 leads",    "color": "teal"},
+      {"label": "Engagement",   "body": "4,800 qualified", "color": "blue"},
+      {"label": "Conversion",   "body": "960 trials",      "color": "green"}
     ],
     "output": {"label": "Revenue", "body": "€9.6M ARR"}
   }
 }
 // Key is "inputs" + "output" — NOT "stages"
+// per-input color (optional): "gray" | "teal" | "blue" | "green" | "yellow" | "orange" | "red" | "pink" | "purple"
 ```
 
 #### `journey_map`
@@ -895,6 +921,9 @@ Score is a fraction from 0.0 (empty) to 1.0 (fully filled). Scale and scale_labe
   }
 }
 // Layout key: "2x2_matrix" — NOT "matrix_2x2"
+// Use whenever the source has exactly 4 equal boxes/quadrants in a 2-row grid.
+// Do NOT use two_column for 4-item grids — two_column silently drops items 3 and 4.
+// Quadrant labels: ≤30 chars each — short noun phrases only, not full sentences.
 // Framework presets: "framework": "bcg" | "swot" | "ansoff" | "risk" — auto-fills axis/quadrant labels
 ```
 
@@ -1020,14 +1049,19 @@ Score is a fraction from 0.0 (empty) to 1.0 (fully filled). Scale and scale_labe
   "content": {
     "columns": 3,
     "items": [
-      {"icon": "🏥",  "title": "Patient First",   "body": "Outcomes over processes", "highlighted": false},
-      {"icon": "📊",  "title": "Data-driven",     "body": "Decisions backed by evidence"},
-      {"icon": "⚡",  "title": "Speed",           "body": "Bias for action",         "highlighted": true}
+      {"icon": "users",     "title": "Patient First",   "body": "Outcomes over processes", "highlighted": false},
+      {"icon": "chart_bar", "title": "Data-driven",     "body": "Decisions backed by evidence"},
+      {"icon": "target",    "title": "Speed",           "body": "Bias for action",         "highlighted": true}
     ]
   }
 }
 // columns: 2 | 3 (default 3); max 9 items (excess silently dropped)
-// icon MUST be an emoji string — named icon keys are NOT supported here
+// icon MUST be a named string from the 26-icon registry (anything else renders as a plain dot):
+//   alert, arrow_down, arrow_right, arrow_up, calendar,
+//   chart_bar, chart_line, chart_pie, check, clock, doc,
+//   flag, gear, globe, info, lightbulb, lock, money, search,
+//   shield, target, trending_down, trending_up, users, x
+// Pick the closest semantic match (see icon selection guide in §9 topic_set for guidance)
 // highlighted: true fills the card background with Merck Purple
 ```
 
@@ -1226,17 +1260,21 @@ Any slide can be moved to an appendix section by setting the `appendix` flag:
 
 | Field | Location | Limit |
 |---|---|---|
-| `action_title` | slide-level | 80 chars (60 for cover) |
-| `takeaway` | slide-level | 120 chars |
-| `body` | inside content objects | 130 chars |
+| `action_title` | slide-level | 120 chars (60 for cover) |
+| `takeaway` | slide-level | 90 chars |
+| `body` | inside content objects | 130 chars (general) |
 | `desc` | inside content objects | 160 chars |
 | `context` | inside content objects | 130 chars |
 | `note` | inside content objects | 80 chars |
 | `exec_summary key_messages[].body` | content | 120 chars |
+| `two/three/four_column body` | content | 300 chars (full prose allowed) |
+| `two/three/four_column items[] each item` | content | 120 chars per bullet |
+| `label_rows rows[].body` | content | 300 chars (full prose allowed) |
 | `decision_rows decisions[].desc` | content | 160 chars |
 | `phase_process phases[].body` | content | 100 chars |
 | `milestone_timeline milestones[].body` | content | 80 chars |
 | `hub_spoke spokes[].body` | content | 100 chars |
+| `topic_set topics[].body` | content | 120 chars |
 | `status_table cell values` | content | 45 chars |
 
 When content is dense, prefer fewer items with tighter text over many items with long text.
@@ -1421,7 +1459,7 @@ These mistakes produce silently empty or broken slides — no error is raised:
 | `waterfall_slide` | `"up"` / `"down"` bar types | `"positive"` / `"negative"` |
 | `cover` | `subtitle` inside `content` | `subtitle` at slide level |
 | `section_divider` | chapter number in `section_number` | chapter number in `content.number` |
-| `icon_grid` | named icon string (e.g. `"target"`) | emoji string (e.g. `"🎯"`) |
+| `icon_grid` | emoji string (e.g. `"🎯"`) — renders as text, not vector icon | named icon string (e.g. `"target"`) from the 26-icon registry |
 | `topic_set` | emoji string (e.g. `"🎯"`) as icon | named icon string (e.g. `"target"`) |
 | `score_table` Harvey Ball | `score: 4` (integer out of scale) | `score: 0.75` (float 0.0–1.0) when `rating_type: "harvey"` |
 | `road_to_success` | `"stages"` containing phases without `title`/`body` | `stages: [{title, body}]` |
@@ -1445,7 +1483,15 @@ These mistakes produce silently empty or broken slides — no error is raised:
 11. `subtitle` always lives at slide level. Never put it inside `content`.
 12. Section dividers: `section_number: null`; display chapter number via `content.number`.
 13. Vary layout families: no more than 2 consecutive slides from the same family.
-14. `takeaway` is null on: cover, agenda, section_divider, close, exec_summary, hero_stat, pull_quote.
+14. **Chrome and takeaway:** `takeaway` must be `null` on ALL slides unless `chrome.takeaway_bands`
+    is explicitly `true`. When `takeaway_bands` is true, write a takeaway on every content slide.
+    Omit takeaway regardless on: cover, agenda, section_divider, close, exec_summary, hero_stat, pull_quote.
+15. **Text preservation:** Copy all bullet points and body text from the source VERBATIM into
+    content fields. Do not paraphrase, summarise, reorder, or rewrite any source text.
+    Your only creative licence is: `action_title` (derived from source heading, ≤120 chars),
+    `takeaway` (new "so what" sentence you write), and structural fields (layout, page_function,
+    style, category, section_number, color_theme). For figure/chart blocks in the source, use
+    `"[PLACEHOLDER: <original description>]"` — never invent chart data or axis values.
 
 ---
 

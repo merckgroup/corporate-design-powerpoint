@@ -193,6 +193,32 @@ pip install -r requirements.txt --upgrade
 
 ---
 
+## Template files
+
+The pipeline ships with two templates (EU and USA defaults). Division-specific templates must be added manually.
+
+### Division × region file names
+
+| `division` | EU template file | USA template file |
+|---|---|---|
+| `merck` *(default)* | `EU_Merck_Themed.pptx` ✅ included | `USA_Merck_Themed_Base_v1.pptx` ✅ included |
+| `emd_electronics` | `EU_EMDElectronics_Themed.pptx` | `USA_EMDElectronics_Themed.pptx` |
+| `emd_serono` | `EU_EMDSerono_Themed.pptx` | `USA_EMDSerono_Themed.pptx` |
+| `millipore_sigma` | `EU_MilliporeSigma_Themed.pptx` | `USA_MilliporeSigma_Themed.pptx` |
+| `merck_asia` | `EU_MerckAsia_Themed.pptx` | `USA_MerckAsia_Themed.pptx` |
+
+If a division-specific file is missing the pipeline falls back to the region default — no error is raised.
+
+### Adding a division template
+
+1. In empower, go to **Corporate Design Templates → Master Templates → {Division}** and export the master template as a `.pptx` file.
+2. Name the file according to the table above.
+3. Place it in `merck_pptx/templates/`.
+
+The pipeline picks it up automatically on the next run.
+
+---
+
 ## Troubleshooting
 
 **`ModuleNotFoundError: No module named 'merck_pptx'`**

@@ -36,7 +36,7 @@ from ._ml_chrome import (
     _tracked, _track_letters, _format_section_number, _pad_int,
     _render_action_title, _source_line,
     statement_card, in_slide_section,
-    _takeaway_band, _superscript,
+    _takeaway_band, _superscript, _chrome,
 )
 from ._ml_charts import (
     add_slope_chart, add_dot_plot, add_marimekko, add_waterfall,
@@ -705,23 +705,25 @@ def build_section_divider(prs, meta, number=None, title=None, style="merck_execu
     divider_layout = _divider_layout(prs) if not _is_dark(style) else None
     if divider_layout is not None:
         slide = prs.slides.add_slide(divider_layout)
-        # Populate number placeholder (idx 0).
+        # idx=13 is the LEFT small number blob (3" wide); idx=0 is the RIGHT wide
+        # title area (6" wide).  Confirmed by inspecting EU_Merck_Themed.pptx layout.
+        # Populate number placeholder (idx 13 — LEFT blob).
         if num_str:
-            ph0 = _populate_placeholder(0, slide, num_str)
-            if ph0 is not None and ph0.has_text_frame:
-                ph0.text_frame.word_wrap = True
+            ph13 = _populate_placeholder(13, slide, num_str)
+            if ph13 is not None and ph13.has_text_frame:
+                ph13.text_frame.word_wrap = False  # number is never multi-line
                 try:
                     from pptx.enum.text import MSO_AUTO_SIZE
-                    ph0.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+                    ph13.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
                 except Exception:
                     pass
-        # Populate chapter title placeholder (idx 13).
-        ph13 = _populate_placeholder(13, slide, str(title))
-        if ph13 is not None and ph13.has_text_frame:
-            ph13.text_frame.word_wrap = True
+        # Populate chapter title placeholder (idx 0 — RIGHT wide area).
+        ph0 = _populate_placeholder(0, slide, str(title))
+        if ph0 is not None and ph0.has_text_frame:
+            ph0.text_frame.word_wrap = True
             try:
                 from pptx.enum.text import MSO_AUTO_SIZE
-                ph13.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+                ph0.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
             except Exception:
                 pass
         # Add bottom chrome (classification + page number).
@@ -762,7 +764,9 @@ def build_section_divider(prs, meta, number=None, title=None, style="merck_execu
              Emu(int(Pt(2.5))), accent_color)
 
     # Emit takeaway band and/or source line if supplied.
-    if takeaway:
+    # NOTE: takeaway_bands chrome flag must be enabled for the band to render;
+    # passing takeaway text alone is not sufficient (the flag gates all slides).
+    if takeaway and _chrome(meta, "takeaway_bands"):
         _takeaway_band(slide, takeaway, style)
     if source:
         _source_line(slide, Inches(0.65), SOURCE_Y, Inches(12.0), SOURCE_H,
@@ -847,15 +851,17 @@ def build_close(prs, meta, action_statement=None, style="merck_executive",
     if parts:
         sep = "   •   "
         tag_color = PANEL_LIGHT if dark else PURPLE_MUTED
-        # When a takeaway band is present, the takeaway sits at 6.83; move the
-        # tagline above the gold rule (which is at 2.80) so it doesn't collide.
-        tag_y = Inches(2.50) if takeaway else Inches(6.40)
+        # Move tagline above the gold rule only when the takeaway band will
+        # actually render (requires both takeaway text AND the chrome flag).
+        tag_y = (Inches(2.50)
+                 if (takeaway and _chrome(meta, "takeaway_bands"))
+                 else Inches(6.40))
         txt(slide, Inches(0.65), tag_y, Inches(12.0), Inches(0.30),
             sep.join(parts), sz=10, color=tag_color, bold=True,
             font=FONT_BODY)
 
     # Emit takeaway band and/or source line if supplied.
-    if takeaway:
+    if takeaway and _chrome(meta, "takeaway_bands"):
         _takeaway_band(slide, takeaway, style)
     if source:
         _source_line(slide, Inches(0.65), SOURCE_Y, Inches(12.0), SOURCE_H,

@@ -108,15 +108,30 @@ Every deck should have this backbone (in order):
 
 ### 4.3 Action Titles
 
-The `action_title` field is the punchy one-line takeaway at the top of each slide.
+The `action_title` is the single most important quality signal — the punchy declarative takeaway at the top of every slide. It should answer "so what?" not just label the topic.
 
-**Good:** `"Revenue grew 22% YoY; digital channels drove the gain"`  
-**Bad:** `"Revenue Overview"` (noun phrase — tells nothing)
+| Rule | Example |
+|---|---|
+| Always a declarative sentence | `"Two Sites Drag the Portfolio; Filler Replacement Resolves Both"` |
+| Never a noun phrase or topic label | ~~`"Portfolio Overview"`~~ |
+| Preferred format: Insight; Consequence | `"OEE Improved 5.4 Points to 84%; Premium SKU Mix Is the Driver"` |
+| Numbers beat adjectives | `"Revenue Up 8% to €4.2B"` not `"Strong Revenue Growth"` |
+| Max 120 characters (60 for cover) | Full prose sentence is fine |
+| Never truncate with `…` | Only use `…` when the source heading itself exceeds 120 chars |
+| Semicolons, not dashes | ~~`"Revenue grew — best quarter ever"`~~ |
 
-- Use declarative sentences, not noun phrases
-- Prefer numbers over vague adjectives: "22% growth" not "significant growth"  
-- Max ~80 characters — it must fit on one line
-- Use `"Title; Subtitle"` for cover slides (semicolon separates title from department)
+For cover slides, use `"Title; Department subtitle"` — the semicolon separates deck title from department.
+
+For high-impact slides (Executive Summary, Recommendation, Decision Request) you can italicise a run within the title:
+
+```json
+"action_title": [
+  ["Three decisions today ", false],
+  ["unlock the Q3 trajectory.", true]
+]
+```
+
+Italic runs render in gold italic. Use sparingly — no more than one in four slides.
 
 ---
 
@@ -243,10 +258,13 @@ The `action_title` field is the punchy one-line takeaway at the top of each slid
 {
   "layout": "two_column",
   "content": {
-    "left":  { "header": "Left heading", "items": ["Point 1", "Point 2"] },
-    "right": { "header": "Right heading", "items": ["Point 1", "Point 2"] }
+    "left":  { "label": "Left heading", "body": "Key claim or hero sentence (≤300 chars)", "tone": "neutral",  "items": ["Sub-bullet expanding on body"] },
+    "right": { "label": "Right heading","body": "Key claim or hero sentence (≤300 chars)", "tone": "positive", "items": ["Sub-bullet expanding on body"] }
   }
 }
+// Use for EXACTLY 2 items. NEVER use two_column for 4 items — use 2x2_matrix instead.
+// tone: "positive" | "negative" | "neutral"
+// NEVER put the same content in both body AND items — both render visibly on the slide
 ```
 
 ### `chart_slide`
@@ -392,10 +410,19 @@ The `action_title` field is the punchy one-line takeaway at the top of each slid
     "deck_style":      "merck_corporate",  // Required: "merck_executive" | "merck_corporate" | "merck_storytelling"
     "color_theme":     "plastic",          // Required: "plastic" | "functional" | "organic" | "synthetic" | "technical" | "electronics"
     "variety_mode":    "default",          // Optional: "default" | "creative"
-    "show_disclaimer": false               // Optional: show legal disclaimer text
+    "show_disclaimer": false,              // Optional: show legal disclaimer text
+    "chrome": {                            // Optional: opt-in custom chrome elements
+      "progress_bar":         false,       //   Top proportional fill strip
+      "section_circles":      false,       //   Numbered circles + category tag
+      "takeaway_bands":       false,       //   Purple takeaway band (LLM writes takeaway only if true)
+      "footer_breadcrumb":    false,       //   "Deck • Category" left footer
+      "classification_badge": false        //   "Classification: INTERNAL" badge top-right (non-standard)
+    }
   }
 }
 ```
+
+> **Default = standard empower.** All `chrome` flags default to `false`. Only the Merck logo, classification badge, and page number are rendered unless you explicitly enable a flag.
 
 ---
 
@@ -429,6 +456,10 @@ The pipeline applies all fonts automatically. For reference:
 | section_number on cover/agenda/divider/close | Renders incorrectly | Set `"section_number": null` |
 | Gaps in section_number | Out-of-sequence numbering visible | Use 1, 2, 3 ... with no gaps |
 | Noun-phrase action_title | Loses the "so what" | Write as a declarative sentence |
+| action_title over 120 chars (60 for cover) | Truncated silently | Keep within the limit; prose is fine |
+| Using `two_column` for 4 items | Items 3 and 4 silently dropped | Use `2x2_matrix` for 4-item grids |
+| Same content in both `body` and `items` | Both render — content duplicated on slide | Use one or the other, not both |
+| `icon_grid` with emoji string | Renders as small text symbol, not vector icon | Use named icon string (e.g. `"target"`, `"users"`) |
 | More than 5 items in exec_summary | Truncated silently | Keep to ≤ 5 key messages |
 | More than 5 decisions in decision_rows | Truncated silently | Keep to ≤ 5 rows |
 | More than 5 phases in phase_process | Truncated silently | Keep to ≤ 5 phases |

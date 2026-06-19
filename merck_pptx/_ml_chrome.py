@@ -110,6 +110,20 @@ def _format_section_number(num):
 
 
 # ===========================================================================
+# Chrome feature flags
+# ===========================================================================
+
+def _chrome(meta: dict, key: str) -> bool:
+    """Return the boolean value of a chrome flag from meta.chrome, default False.
+
+    All custom chrome elements are opt-in — the default (empower-compatible)
+    output renders none of them.  A caller enables a feature by setting
+    meta.chrome.<key> to true in the plan JSON.
+    """
+    return bool((meta or {}).get("chrome", {}).get(key, False))
+
+
+# ===========================================================================
 # Universal chrome
 # ===========================================================================
 
@@ -146,8 +160,9 @@ def _top_chrome(slide, meta, category, palette, top_bar=False,
         # Full-width gold bar at the very top of the slide (cover only).
         hairline(slide, Inches(0.0), Inches(0.0), SLIDE_W, Inches(0.20),
                  MERCK_GOLD)
-    elif page is not None and total:
+    elif _chrome(meta, "progress_bar") and page is not None and total is not None:
         # Thin progress bar at the very top: light track + gold fill.
+        # Opt-in only — off by default so the output matches empower style.
         try:
             p = int(page)
             t = int(total)
@@ -159,7 +174,10 @@ def _top_chrome(slide, meta, category, palette, top_bar=False,
             bar_w = Inches(12.0)
             bar_h = Inches(0.05)
             track_color = PURPLE_MUTED if dark else LIGHT_GRAY
-            fill_color = pal["hot"] if dark else pal["highlight"]
+            # Dark themes use their "hot" accent; light themes use MERCK_GOLD
+            # (the hot-pink accent) for a consistent progress-bar colour across
+            # all light color themes regardless of per-theme highlight color.
+            fill_color = pal["hot"] if dark else MERCK_GOLD
             hairline(slide, bar_x, bar_y, bar_w, bar_h, track_color)
             # Filled portion proportional to page / total. Min 1px visible.
             frac = max(0.0, min(1.0, p / t))
@@ -167,24 +185,25 @@ def _top_chrome(slide, meta, category, palette, top_bar=False,
             if fill_w_emu > 0:
                 hairline(slide, bar_x, bar_y, fill_w_emu, bar_h, fill_color)
 
-    # Classification badge (top-right, two stacked lines). Kept for
-    # compliance — internal vs confidential should be visible at a glance.
-    classification = meta.get("classification") or "Internal"
-    badge = slide.shapes.add_textbox(CLASS_BADGE_X, CLASS_BADGE_Y,
-                                     CLASS_BADGE_W, Inches(0.50))
-    tf = badge.text_frame
-    tf.word_wrap = False
-    tf.margin_left = Inches(0.02)
-    tf.margin_right = Inches(0.02)
-    tf.margin_top = Inches(0.0)
-    tf.margin_bottom = Inches(0.0)
-    p1 = tf.paragraphs[0]
-    p1.alignment = PP_ALIGN.CENTER
-    _add_run(p1, "Classification:", sz=9, color=MERCK_GOLD, font=FONT_BODY)
-    p2 = tf.add_paragraph()
-    p2.alignment = PP_ALIGN.CENTER
-    _add_run(p2, str(classification).upper(), sz=9, color=MERCK_GOLD,
-             bold=True, font=FONT_BODY)
+    # Classification badge (top-right). Opt-in only — not present in the
+    # standard empower content slide layouts. Enable via meta.chrome.classification_badge.
+    if _chrome(meta, "classification_badge"):
+        classification = meta.get("classification") or "Internal"
+        badge = slide.shapes.add_textbox(CLASS_BADGE_X, CLASS_BADGE_Y,
+                                         CLASS_BADGE_W, Inches(0.50))
+        tf = badge.text_frame
+        tf.word_wrap = False
+        tf.margin_left = Inches(0.02)
+        tf.margin_right = Inches(0.02)
+        tf.margin_top = Inches(0.0)
+        tf.margin_bottom = Inches(0.0)
+        p1 = tf.paragraphs[0]
+        p1.alignment = PP_ALIGN.CENTER
+        _add_run(p1, "Classification:", sz=9, color=MERCK_GOLD, font=FONT_BODY)
+        p2 = tf.add_paragraph()
+        p2.alignment = PP_ALIGN.CENTER
+        _add_run(p2, str(classification).upper(), sz=9, color=MERCK_GOLD,
+                 bold=True, font=FONT_BODY)
 
 
 def _bottom_chrome(slide, meta, category, page, total, palette):
@@ -204,7 +223,7 @@ def _bottom_chrome(slide, meta, category, page, total, palette):
     _ftr_dark = _is_dark(palette)
     footer_color = MERCK_PURPLE if not _ftr_dark else PANEL_LIGHT
 
-    if left_parts:
+    if _chrome(meta, "footer_breadcrumb") and left_parts:
         txt(slide, Inches(0.65), FOOTER_TEXT_Y, Inches(10.0), Inches(0.20),
             "   •   ".join(left_parts), sz=8,
             color=footer_color, bold=False,
@@ -503,8 +522,9 @@ def apply_chrome(slide, meta, action_title, category=None, subtitle=None,
     _top_chrome(slide, meta, category, palette, page=page, total=total)
     _bottom_chrome(slide, meta, category, page, total, palette)
 
+    circles_on = _chrome(meta, "section_circles")
     title_y = TITLE_Y_NUMBERED
-    if show_section_marker and category:
+    if show_section_marker and category and circles_on:
         if section_icon:
             _section_marker(slide, None, category, palette,
                             icon=section_icon)
@@ -528,7 +548,7 @@ def apply_chrome(slide, meta, action_title, category=None, subtitle=None,
         sub_y = title_y + SUB_GAP
         _subtitle(slide, SUB_X, sub_y, SUB_W, SUB_H, subtitle, palette)
 
-    if takeaway:
+    if takeaway and _chrome(meta, "takeaway_bands"):
         _takeaway_band(slide, takeaway, palette)
     # Source + methodology note placement: when both are supplied, the
     # methodology note sits ABOVE the source line (so it doesn't collide with

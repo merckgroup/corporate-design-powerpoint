@@ -42,7 +42,7 @@ from ._ml_charts import (
     add_slope_chart, add_dot_plot, add_marimekko, add_waterfall,
     add_small_multiples, add_simple_bar, _render_chart,
 )
-from ._ml_helpers import _style_or_promote, _tone_color, _rag_color, _norm_key
+from ._ml_helpers import _style_or_promote, _tone_color, _rag_color, _norm_key, _named_color
 
 # ===========================================================================
 # Framework presets for non-matrix layouts.
@@ -363,6 +363,10 @@ def build_label_rows(prs, meta, action_title=None, rows=None, takeaway=None,
         if "rows"        in content: rows        = content["rows"]
         if "takeaway"    in content: takeaway    = content["takeaway"]
         if "label_color" in content: label_color = content["label_color"]
+    # Coerce string label_color to RGB tuple so LLM-generated plans that
+    # pass e.g. "red" instead of an RGB tuple don't crash rounded().
+    if isinstance(label_color, str):
+        label_color = _named_color(label_color, None)
     style = _style_or_promote(category, style)
     pal = _palette_for(style)
     slide = _new_slide(prs, bg_color=pal["bg"])
@@ -381,12 +385,14 @@ def build_label_rows(prs, meta, action_title=None, rows=None, takeaway=None,
     label_w = Inches(3.10)
     body_x = Inches(0.65) + label_w + Inches(0.30)
     body_w = Inches(12.0) - label_w - Inches(0.30)
-    fill_color = label_color if label_color is not None else MERCK_PURPLE
+    default_fill = label_color if label_color is not None else MERCK_PURPLE
     # On dark / storytelling bg, body text needs to be light.
     body_color = WHITE if _is_dark(style) else INK_DARK
 
     for i, row in enumerate(rs):
         ry = zone_top + i * (row_h + gap)
+        # Per-row color: row["color"] name overrides the deck-level label_color.
+        fill_color = _named_color(row.get("color"), default_fill)
         # Label card: colored fill, rounded corners, white bold text centered.
         card = rounded(slide, Inches(0.65), ry, label_w, row_h,
                        fill=fill_color, adj=2000)

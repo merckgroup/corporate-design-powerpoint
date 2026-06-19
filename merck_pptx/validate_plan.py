@@ -62,6 +62,11 @@ _COUNT_WORDS = {
     "six": 6, "seven": 7, "eight": 8,
 }
 
+_VALID_CHROME_FLAGS = frozenset({
+    "progress_bar", "section_circles", "takeaway_bands",
+    "footer_breadcrumb", "classification_badge",
+})
+
 _FORBIDDEN_CLASSIFICATIONS = frozenset({"secret", "top secret", "ts/sci"})
 _VALID_CLASSIFICATIONS    = frozenset({"public", "internal", "confidential"})
 _VALID_COLOR_THEMES       = frozenset({
@@ -138,6 +143,17 @@ def validate_plan(plan: dict) -> list:
             f"Defaulting to 'plastic'."
         )
 
+    # Soft: unknown chrome flags — a typo silently disables the feature.
+    chrome = meta.get("chrome")
+    if isinstance(chrome, dict):
+        unknown_flags = set(chrome.keys()) - _VALID_CHROME_FLAGS
+        if unknown_flags:
+            warnings.append(
+                f"Unknown chrome flag(s): {sorted(unknown_flags)}. "
+                f"Valid flags: {sorted(_VALID_CHROME_FLAGS)}. "
+                f"Typos silently disable the feature."
+            )
+
     # Soft: unknown division — warn but don't block.
     division = str(meta.get("division") or "").strip().lower()
     if division and division not in _VALID_DIVISIONS:
@@ -183,13 +199,13 @@ def validate_plan(plan: dict) -> list:
                 f"is a content slide but has no section_number."
             )
 
-        # Warn: action_title length on non-cover slides (max 80 chars).
+        # Warn: action_title length on non-cover slides (max 120 chars).
         # _title_text handles both str and list-of-(text, italic_bool) formats.
         if layout != "cover" and fn_norm != "cover":
             raw_title = _title_text(s.get("action_title"))
-            if raw_title and len(raw_title) > 80:
+            if raw_title and len(raw_title) > 120:
                 warnings.append(
-                    f"Slide page={s.get('page')}: action_title is {len(raw_title)} chars (max 80)."
+                    f"Slide page={s.get('page')}: action_title is {len(raw_title)} chars (max 120)."
                 )
 
         # Hard: cover title > 60 chars or missing subtitle

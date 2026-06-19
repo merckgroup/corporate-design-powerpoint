@@ -1517,15 +1517,17 @@ def _sanitize_obj(obj: object, rules: dict) -> None:
 
 # Per-field character limits (must align with rendering engine constraints).
 # Top-level slide fields:
-_SLIDE_LIMITS = {"action_title": 80}
+_SLIDE_LIMITS = {"action_title": 120}
 # Content fields — applied at every dict level (top-level content and list items).
 # Using one dict for both avoids divergence and closes the gap where list-item
 # fields like "context" (used in kpi_dashboard) were not being truncated.
+# body/desc/context are raised from 130/160/130 → they hold prose descriptions
+# in two-column, label-row and four-column cards that legitimately run 200-300 chars.
 _CONTENT_FIELD_LIMITS = {
     "takeaway": 120,
-    "body":     130,
-    "desc":     160,
-    "context":  130,
+    "body":     300,
+    "desc":     300,
+    "context":  200,
     "note":     80,
 }
 

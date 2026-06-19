@@ -44,7 +44,7 @@ from ._ml_charts import (
     add_slope_chart, add_dot_plot, add_marimekko, add_waterfall,
     add_small_multiples, add_simple_bar, _render_chart,
 )
-from ._ml_helpers import _style_or_promote, _tone_color, _rag_color, _norm_key
+from ._ml_helpers import _style_or_promote, _tone_color, _rag_color, _norm_key, _named_color
 
 _CIRCULAR_PRESETS = {
     "pdca": {
@@ -725,6 +725,7 @@ def build_funnel(prs, meta, action_title=None, inputs=None,
                  page=page, total=total, section_number=section_number,
                  palette=style)
 
+    # Cap at 4 inputs — the funnel geometry is designed for 2-4 boxes.
     inputs = list(inputs or [])[:4]
     if not inputs:
         return slide
@@ -739,16 +740,20 @@ def build_funnel(prs, meta, action_title=None, inputs=None,
 
     total_in_h = n * box_h + (n - 1) * gap
     in_start_y = zone_y + (zone_h - total_in_h) / 2
-    IN_COLORS  = [MERCK_PURPLE, MERCK_BLUE, PURPLE_MUTED, MERCK_AQUA]
+    # Default progression: muted purple → teal → green → yellow, visually distinct per step.
+    IN_COLORS  = [PURPLE_MUTED, LY_CYAN, GOOD_GREEN, MERCK_YELLOW]
 
     for i, inp in enumerate(inputs):
         iy  = in_start_y + i * (box_h + gap)
-        col = IN_COLORS[i % len(IN_COLORS)]
+        # Per-input color: inp["color"] name overrides the default progression.
+        col = _named_color(inp.get("color"), IN_COLORS[i % len(IN_COLORS)])
         rounded(slide, zone_x, iy, in_w, box_h, fill=col)
+        # Ensure label text is readable: switch to dark text on yellow-fill boxes.
+        label_text_color = MERCK_PURPLE if col == MERCK_YELLOW else MERCK_YELLOW
         txt(slide, zone_x + Inches(0.14), iy + Inches(0.08),
             in_w - Inches(0.28), Inches(0.24),
             str(inp.get("label", "")).upper(),
-            sz=9, color=MERCK_YELLOW, bold=True, font=FONT_BODY)
+            sz=9, color=label_text_color, bold=True, font=FONT_BODY)
         txt(slide, zone_x + Inches(0.14), iy + Inches(0.34),
             in_w - Inches(0.28), box_h - Inches(0.42),
             str(inp.get("body", "")),

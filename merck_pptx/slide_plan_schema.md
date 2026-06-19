@@ -48,8 +48,31 @@ This schema is the source of truth. The agent does not generate slides outside t
 | single_sentence_takeaway | yes | The whole deck argument in one line |
 | final_ask | yes | The decision or action requested |
 | light_footer | optional | Boolean; suppresses dark purple footer band |
-| cover_top_bar | optional | Boolean; full-width MERCK_GOLD bar at very top of cover |
+| cover_top_bar | optional | Boolean; full-width MERCK_GOLD bar at very top of cover — only applies to the programmatic fallback cover (no themed template found); has no effect on native template covers |
 | region | yes | `"EU"` (uses `Merck_Themed_Merck.pptx`) or `"USA"` (uses `Merck_Themed_Base_v1.pptx`). Default: `"EU"`. Controls template and brand identity. |
+| chrome | optional | Object controlling opt-in custom chrome elements (see below). All default to `false` = standard empower output. |
+
+### chrome sub-block (all default false)
+
+```json
+"chrome": {
+  "progress_bar":         false,
+  "section_circles":      false,
+  "takeaway_bands":       false,
+  "footer_breadcrumb":    false,
+  "classification_badge": false
+}
+```
+
+| Flag | Effect when `true` |
+|---|---|
+| `progress_bar` | Thin proportional fill strip at the very top of every content slide |
+| `section_circles` | Numbered purple circles + spaced-caps category tag top-left of every content slide |
+| `takeaway_bands` | Themed takeaway band just above footer; write `takeaway` text on slides only when this is `true` |
+| `footer_breadcrumb` | `"Deck Label • Category"` left-aligned in the slide footer |
+| `classification_badge` | `"Classification: INTERNAL"` badge at top-right of every content slide — not present in standard empower content layouts; enable only for distribution compliance |
+
+All five are independent and can be combined freely. Without this block (or with all flags `false`) the output matches standard empower: Merck logo and page number only on content slides.
 
 ---
 
@@ -140,6 +163,12 @@ Wrong keys produce silently empty slides — no error is raised.
 | Chart layout key | `chart_slide` | `chart` |
 | Waterfall layout key | `waterfall_slide` | `waterfall` |
 | Matrix layout key | `2x2_matrix` | `matrix_2x2` |
+| `milestone_timeline` milestones | `label` + `description` (or `title` + `body`) | any other key names |
+| `milestone_timeline` status | `"upcoming"` · `"completed"` · `"active"` (`"future"` · `"done"` · `"current"` also accepted) | `"scheduled"` · `"late"` · `"overdue"` |
+| `status_table` | `rows` only — columns are auto-derived from header names | explicit `columns` array not required |
+| `waterfall_slide` bar types | `"total"` · `"positive"` · `"negative"` (`"start"` · `"up"` · `"down"` also accepted) | `"begin"` · `"increase"` · `"decrease"` |
+| `risk_heatmap` scores | `likelihood: 1–5` + `impact: 1–5` (integers) | `"high"` · `"low"` strings |
+| `chart_slide` data | `chart: {type, data: {categories, series}}` | flat `items` list |
 
 ---
 
