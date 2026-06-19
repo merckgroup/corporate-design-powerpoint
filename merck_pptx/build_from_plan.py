@@ -114,15 +114,19 @@ def _resolve_template(region: str, color_theme: str,
         r = "usa"
 
     # 0. BinaryFile template — correct per-theme layout/design shapes baked in.
-    #    USA uses its own legally-required template (different disclaimer text).
-    if r not in ("usa",):
-        try:
-            from .binary_templates import resolve_template_path
-            bp = resolve_template_path(d, color_theme)
+    #    Exact match only: do NOT fall back to a "merck" BinaryFile for a
+    #    non-merck division — that would silently embed the wrong logo/branding.
+    #    All regions (EU, USA, Asia, etc.) use BinaryFiles when registered;
+    #    static templates/ files serve as fallback for unregistered combinations.
+    try:
+        from .binary_templates import load_registry, uid_to_path
+        uid = (load_registry().get(d) or {}).get(color_theme)
+        if uid:
+            bp = uid_to_path(uid)
             if bp is not None:
                 return bp
-        except Exception:
-            pass
+    except Exception:
+        pass
 
     # 1. Division-specific template.
     fname = _DIVISION_TEMPLATES.get((r, d))
@@ -213,16 +217,22 @@ _THEME_BG_HEX = {
 }
 
 
-def _apply_color_theme(prs, color_theme: str) -> None:
+def _apply_color_theme(prs, color_theme: str,
+                       patch_hardcoded_fills: bool = True) -> None:
     """Apply a Merck Corporate Design color theme to the loaded presentation.
 
-    Modifies two things IN MEMORY (original file untouched):
+    Modifies IN MEMORY (original file untouched):
     1. The slide master's theme color scheme XML — so shapes using
-       scheme:accent1 / scheme:dk2 / scheme:accent5 etc. automatically
-       render in the correct theme colors.
-    2. All layout shape XML — replaces the hardcoded #B4DC96 pale-green
-       that forms the "light panel" background on covers and dividers with
-       the appropriate theme background color.
+       scheme:accent1 / scheme:dk2 / scheme:accent5 / scheme:accent3 etc.
+       automatically render in the correct theme colors.
+    2. (Only when patch_hardcoded_fills=True) All layout shape XML — replaces
+       the hardcoded #B4DC96 pale-green that forms the "light panel" in the
+       static EU template with the appropriate theme background color.
+
+    patch_hardcoded_fills should be False for BinaryFile templates: their
+    layout shapes already carry the correct per-theme hardcoded fills, and
+    overwriting them (B4DC96 → A5CD50 for plastic) would make the light panel
+    invisible by matching the slide background color.
 
     Must be called immediately after open_deck() and before any slides are
     added.  Themes map exactly to the 6 official Merck Corporate Design
@@ -302,7 +312,16 @@ def _apply_color_theme(prs, color_theme: str) -> None:
     # 2. Replace hardcoded #B4DC96 hex in all layout shapes.
     #    bg_hex = new color hex  → replace the fill value
     #    bg_hex = None           → make the shape transparent (noFill)
+    #
+    #    Skip entirely for BinaryFile templates: their layout shapes already
+    #    carry correct per-theme hardcoded fills (e.g. FFDCB9 for organic,
+    #    B4DC96 for plastic). Overwriting them would corrupt the design —
+    #    for plastic specifically, B4DC96 → A5CD50 makes the light panel
+    #    invisible by matching the lime-green slide background.
     # ------------------------------------------------------------------
+    if not patch_hardcoded_fills:
+        return
+
     if bg_hex is not None and bg_hex.upper() == _TEMPLATE_HARDCODED_BG.upper():
         return   # no change needed for plastic (default)
 
@@ -1674,10 +1693,21 @@ def build_from_plan(plan, output_path, base_pptx: Optional[str] = None,
 
     prs = open_deck(str(template_path))
 
-    # Apply color theme programmatically — modifies the master's theme XML and
-    # replaces hardcoded shape fill colors so ALL cover/divider blob shapes
-    # render in the selected theme's accent colors.  Must happen before slides.
-    _apply_color_theme(prs, color_theme)
+    # Apply color theme to the master's scheme XML (accent1/dk2/accent3/etc.).
+    # For BinaryFile templates the layout shapes already carry the correct
+    # per-theme hardcoded fills — skip step 2 (fill patching) to avoid
+    # overwriting those correct values (e.g. B4DC96 → A5CD50 for plastic
+    # would make the light panel invisible on the lime-green background).
+    try:
+        from .binary_templates import _binary_dir as _bt_binary_dir
+        _is_binary_template = (
+            pathlib.Path(template_path).resolve().parent
+            == pathlib.Path(_bt_binary_dir()).resolve()
+        )
+    except Exception:
+        _is_binary_template = False
+    _apply_color_theme(prs, color_theme,
+                       patch_hardcoded_fills=not _is_binary_template)
     ordered = main_slides + appendix_slides
 
     for s in ordered:
