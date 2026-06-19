@@ -38,7 +38,7 @@ from ._ml_chrome import (
     _tracked, _track_letters, _format_section_number, _pad_int,
     _render_action_title, _source_line,
     statement_card, in_slide_section,
-    _takeaway_band, _superscript,
+    _takeaway_band, _superscript, _content_y,
 )
 from ._ml_charts import (
     add_slope_chart, add_dot_plot, add_marimekko, add_waterfall,
@@ -94,7 +94,7 @@ def build_status_table(prs, meta, action_title=None, columns=None, rows=None, ta
     # Compute column widths. RAG columns are narrower.
     zone_x = CONTENT_X
     zone_w = CONTENT_W
-    zone_y = Inches(2.55) if not subtitle else Inches(2.95)
+    zone_y = _content_y(meta, subtitle=bool(subtitle))
     n = len(cols)
     rag_w = Inches(1.20)
     non_rag_count = n - len(rag_cols)
@@ -364,7 +364,7 @@ def build_pillar_detail(prs, meta, action_title=None, pillar_number=None, pillar
 
     # Left purple panel.
     panel_x = Inches(0.65)
-    panel_y = Inches(2.95) if subtitle else Inches(2.55)
+    panel_y = _content_y(meta, subtitle=bool(subtitle))
     panel_w = Inches(3.40)
     # Panel bottom snaps just above source / takeaway band.
     panel_h = SOURCE_Y - panel_y - Inches(0.30)

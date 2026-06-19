@@ -38,7 +38,7 @@ from ._ml_chrome import (
     _tracked, _track_letters, _format_section_number, _pad_int,
     _render_action_title, _source_line,
     statement_card, in_slide_section,
-    _takeaway_band, _superscript, _callout_block,
+    _takeaway_band, _superscript, _callout_block, _chrome, _content_y,
 )
 from ._ml_charts import (
     add_slope_chart, add_dot_plot, add_marimekko, add_waterfall,
@@ -105,7 +105,7 @@ def build_phase_process(prs, meta, action_title=None, phases=None, takeaway=None
     if not phs:
         return slide
     n = len(phs)
-    zone_top = Inches(2.95) if subtitle else Inches(2.55)
+    zone_top = _content_y(meta, subtitle=bool(subtitle))
     zone_h = Inches(6.50) - zone_top
     # Reserve a top strip for the "STEP a -> STEP b -> ..." breadcrumb.
     breadcrumb_h = Inches(0.32)
@@ -182,11 +182,14 @@ def build_phase_process(prs, meta, action_title=None, phases=None, takeaway=None
         # body region when a long milestone caption needs vertical room.
         ms = ph.get("milestone")
         ms_text = str(ms) if ms else ""
-        ms_is_long = bool(ms_text) and len(ms_text) > 32
-        # Default body bottom margin: 0.60" reserves room for the 0.32" pill +
-        # 0.18" gap + 0.10" slack. For long milestones we reserve 1.00" so the
-        # 0.80"-tall caption sits cleanly below the body.
-        body_bottom_margin = Inches(1.00) if ms_is_long else Inches(0.60)
+        # Milestones ≤32 chars: single-line pill (height 0.32").
+        # Milestones 33–60 chars: taller pill (height 0.48") with 9pt font to
+        #   keep all milestone cards visually consistent (solid colored block).
+        # Milestones >60 chars: italic caption fallback (can't fit in a pill).
+        ms_len = len(ms_text)
+        ms_is_long = bool(ms_text) and ms_len > 60
+        ms_is_medium = bool(ms_text) and 32 < ms_len <= 60
+        body_bottom_margin = Inches(1.00) if ms_is_long else Inches(0.65)
 
         body = ph.get("body", "")
         if body:
@@ -214,8 +217,11 @@ def build_phase_process(prs, meta, action_title=None, phases=None, takeaway=None
                     font=FONT_BODY, align=PP_ALIGN.LEFT,
                     anchor=MSO_ANCHOR.TOP)
             else:
-                pill_h = Inches(0.32)
-                pill_y = cy + cards_h - pill_h - Inches(0.18)
+                # Medium milestones (33-60 chars) use a taller pill so all
+                # milestone treatments remain a consistent solid colored block.
+                pill_h  = Inches(0.48) if ms_is_medium else Inches(0.32)
+                pill_sz = 9            if ms_is_medium else 10
+                pill_y  = cy + cards_h - pill_h - Inches(0.14)
                 if highlighted:
                     if _is_dark(style):
                         pill_fill = PURPLE_DEEP
@@ -231,7 +237,7 @@ def build_phase_process(prs, meta, action_title=None, phases=None, takeaway=None
                     pill_text = WHITE
                 rect(slide, block_x, pill_y, block_w, pill_h, fill=pill_fill)
                 txt(slide, block_x, pill_y, block_w, pill_h,
-                    ms_text, sz=10, color=pill_text, bold=True,
+                    ms_text, sz=pill_sz, color=pill_text, bold=True,
                     font=FONT_BODY, align=PP_ALIGN.CENTER,
                     anchor=MSO_ANCHOR.MIDDLE)
 
@@ -272,7 +278,7 @@ def build_gantt(prs, meta, action_title=None, rows=None, quarters=None, takeaway
                  takeaway=takeaway, source=source, page=page, total=total,
                  palette=style, section_number=section_number, methodology_note=methodology_note)
 
-    zone_top = Inches(2.95) if subtitle else Inches(2.55)
+    zone_top = _content_y(meta, subtitle=bool(subtitle))
     zone_h = Inches(6.50) - zone_top
     qs = list(quarters or ["Q1", "Q2", "Q3", "Q4"])
     qn_count = max(len(qs), 1)
@@ -817,7 +823,7 @@ def build_journey_map(prs, meta, action_title=None, phases=None, rows=None,
     n_phases  = max(len(phases), 1)
     n_rows    = max(len(rows),   1)
 
-    zone_top = Inches(2.55) if not subtitle else Inches(2.95)
+    zone_top = _content_y(meta, subtitle=bool(subtitle))
     zone_h   = Inches(6.40) - zone_top
     label_w  = Inches(1.60)
     grid_x   = Inches(0.65) + label_w

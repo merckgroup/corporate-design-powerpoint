@@ -123,6 +123,24 @@ def _chrome(meta: dict, key: str) -> bool:
     return bool((meta or {}).get("chrome", {}).get(key, False))
 
 
+def _content_y(meta, subtitle=False):
+    """Return the Y coordinate where slide content should start.
+
+    CONTENT_Y (2.55") was sized for the section-circle chrome path where the
+    title sits at TITLE_Y_NUMBERED (1.15") and ends at 2.45".  When circles
+    are off (the default empower-compatible mode), the title ends at 1.75"
+    (TITLE_Y_UNNUMBERED + TITLE_H) and CONTENT_Y leaves a dead 0.80" gap.
+
+    Callers should use this function instead of hardcoding Inches(2.55) so
+    that the gap is automatically tightened when circles are disabled.
+    """
+    if subtitle:
+        return CONTENT_Y_SUBTITLE          # 2.95" — extra room for subtitle
+    if _chrome(meta, "section_circles"):
+        return CONTENT_Y                   # 2.55" — title ends at 2.45" with circles
+    return Inches(1.90)                    # 1.90" — 0.15" gap below title without circles
+
+
 # ===========================================================================
 # Universal chrome
 # ===========================================================================

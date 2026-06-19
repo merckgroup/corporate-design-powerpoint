@@ -38,7 +38,7 @@ from ._ml_chrome import (
     _tracked, _track_letters, _format_section_number, _pad_int,
     _render_action_title, _source_line,
     statement_card, in_slide_section,
-    _takeaway_band, _superscript,
+    _takeaway_band, _superscript, _content_y,
 )
 from ._ml_charts import (
     add_slope_chart, add_dot_plot, add_marimekko, add_waterfall,
@@ -142,7 +142,7 @@ def build_word_cloud(prs, meta, action_title=None, words=None,
     WORD_COLORS = [ACC, HLT, HOT, pal["accent_2"], pal["accent_3"], pal["muted"]]
 
     # Dynamic grid: fill the full content zone (not hard-coded y=1.72)
-    _zone_top = Inches(2.95) if subtitle else Inches(2.55)
+    _zone_top = _content_y(meta, subtitle=bool(subtitle))
     _zone_bot = SOURCE_Y - Inches(0.10)
     _zone_h   = _zone_bot - _zone_top
     _GRID_ROWS, _GRID_COLS = 5, 6
@@ -576,7 +576,7 @@ def build_fishbone(prs, meta, action_title=None, effect=None, bones=None,
     dark = _is_dark(style)
     text_color = WHITE if dark else INK_DARK
 
-    zone_top = Inches(2.55) if not subtitle else Inches(2.95)
+    zone_top = _content_y(meta, subtitle=bool(subtitle))
     zone_h   = Inches(6.40) - zone_top
     mid_y    = zone_top + zone_h / 2
 

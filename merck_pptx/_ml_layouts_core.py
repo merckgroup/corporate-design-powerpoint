@@ -36,7 +36,7 @@ from ._ml_chrome import (
     _tracked, _track_letters, _format_section_number, _pad_int,
     _render_action_title, _source_line,
     statement_card, in_slide_section,
-    _takeaway_band, _superscript, _chrome,
+    _takeaway_band, _superscript, _chrome, _content_y,
 )
 from ._ml_charts import (
     add_slope_chart, add_dot_plot, add_marimekko, add_waterfall,
@@ -309,11 +309,11 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
     if intro_layout is not None:
         slide = prs.slides.add_slide(intro_layout)
 
-        # Inject theme-specific cover shapes from empower local cache.
-        # Shapes are copied from the BinaryFile layout spTree and inserted
-        # behind placeholder content so the visual identity is preserved.
-        # No-op if the cache is absent or the theme has no registered UID.
-        _inject_empower_cover_shapes(slide, theme_lower)
+        # Shape injection is intentionally skipped: the pipeline now opens
+        # BinaryFile PPTXs directly as base templates (binary_templates.py),
+        # so the 'Title' layout already carries the correct per-theme design
+        # shapes.  The old injection added a miscolored Rechteck 73 (using
+        # scheme:accent3, never patched) that covered the layout shapes below.
 
         # Dark color themes (synthetic, electronics) need a dark slide background.
         # The template's "light panel" freeform is made transparent by
@@ -506,7 +506,7 @@ def build_exec_summary(prs, meta, action_title=None, key_messages=None, takeaway
     items = (key_messages or [])[:5]
     n = max(len(items), 1)
     # Content area below the title block.
-    zone_top = Inches(2.95) if subtitle else Inches(2.55)
+    zone_top = _content_y(meta, subtitle=bool(subtitle))
     zone_bot = Inches(6.50)
     zone_h = zone_bot - zone_top
     row_gap = Inches(0.10)
@@ -714,15 +714,17 @@ def build_section_divider(prs, meta, number=None, title=None, style="merck_execu
         # idx=13 is the LEFT small number blob (3" wide); idx=0 is the RIGHT wide
         # title area (6" wide).  Confirmed by inspecting EU_Merck_Themed.pptx layout.
         # Populate number placeholder (idx 13 — LEFT blob).
-        if num_str:
-            ph13 = _populate_placeholder(13, slide, num_str)
-            if ph13 is not None and ph13.has_text_frame:
-                ph13.text_frame.word_wrap = False  # number is never multi-line
-                try:
-                    from pptx.enum.text import MSO_AUTO_SIZE
-                    ph13.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
-                except Exception:
-                    pass
+        # Always clear idx 13 to suppress the "click to edit" default text and
+        # the dotted placeholder border that appears in editing mode when the
+        # plan does not include a chapter number (content: {}).
+        ph13 = _populate_placeholder(13, slide, num_str or " ")
+        if ph13 is not None and ph13.has_text_frame:
+            ph13.text_frame.word_wrap = False  # number is never multi-line
+            try:
+                from pptx.enum.text import MSO_AUTO_SIZE
+                ph13.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+            except Exception:
+                pass
         # Populate chapter title placeholder (idx 0 — RIGHT wide area).
         ph0 = _populate_placeholder(0, slide, str(title))
         if ph0 is not None and ph0.has_text_frame:

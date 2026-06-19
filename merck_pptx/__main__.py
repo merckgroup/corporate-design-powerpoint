@@ -157,6 +157,21 @@ def main():
     bld.add_argument("plan", help="Path to plan .json file")
     bld.add_argument("output", help="Output .pptx path")
 
+    # discover-templates command
+    sub.add_parser(
+        "discover-templates",
+        help="Scan empower BinaryFiles and show all available themed templates",
+    )
+
+    # register-template command
+    reg = sub.add_parser(
+        "register-template",
+        help="Register an empower BinaryFile UID in the template registry",
+    )
+    reg.add_argument("uid",         help="BinaryFile UID (without .pptx extension)")
+    reg.add_argument("division",    help="Division key, e.g. merck, emd_serono, millipore_sigma")
+    reg.add_argument("color_theme", help="Theme key: plastic | functional | organic | synthetic | technical | electronics")
+
     args = parser.parse_args()
 
     if args.command == "build":
@@ -203,6 +218,14 @@ def main():
         except ValueError as e:
             print(f"Error: {e}", file=sys.stderr)
             sys.exit(4)
+
+    elif args.command == "discover-templates":
+        from merck_pptx.binary_templates import cmd_discover
+        cmd_discover()
+
+    elif args.command == "register-template":
+        from merck_pptx.binary_templates import cmd_register
+        cmd_register(args.uid, args.division, args.color_theme)
 
     else:
         parser.print_help()

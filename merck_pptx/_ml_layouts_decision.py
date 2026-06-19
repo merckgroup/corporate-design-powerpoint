@@ -36,7 +36,7 @@ from ._ml_chrome import (
     _tracked, _track_letters, _format_section_number, _pad_int,
     _render_action_title, _source_line,
     statement_card, in_slide_section,
-    _takeaway_band, _superscript, _callout_block,
+    _takeaway_band, _superscript, _callout_block, _content_y,
 )
 from ._ml_charts import (
     add_slope_chart, add_dot_plot, add_marimekko, add_waterfall,
@@ -121,7 +121,7 @@ def build_2x2_matrix(prs, meta, action_title=None, x_axis=None, y_axis=None, qua
 
     margin_left = Inches(0.55)
     margin_bottom = Inches(0.55)
-    zone_top = Inches(2.95) if subtitle else Inches(2.55)
+    zone_top = _content_y(meta, subtitle=bool(subtitle))
     zone_h = Inches(6.50) - zone_top
     plot_x = Inches(0.65) + margin_left
     plot_y = zone_top + Inches(0.05)
@@ -234,7 +234,7 @@ def build_decision_rows(prs, meta, action_title=None, decisions=None, takeaway=N
 
     rows = (decisions or [])[:5]
     n = max(len(rows), 1)
-    zone_top = Inches(2.95) if subtitle else Inches(2.55)
+    zone_top = _content_y(meta, subtitle=bool(subtitle))
     zone_h = Inches(6.50) - zone_top
     gap = Inches(0.12)
     row_h = (zone_h - gap * (n - 1)) / n
@@ -317,7 +317,7 @@ def build_before_after(prs, meta, action_title=None, before=None, after=None, ta
                  page=page, total=total, palette=style,
                  section_number=section_number, methodology_note=methodology_note)
 
-    zone_top = Inches(2.95) if subtitle else Inches(2.50)
+    zone_top = _content_y(meta, subtitle=bool(subtitle))
     # Equal-height enforcement.
     base_h = Inches(2.55)
     estimated = []
@@ -439,7 +439,7 @@ def build_comparison_table(prs, meta, action_title=None, options=None,
     }
 
     zone_x    = Inches(0.55)
-    zone_y    = Inches(2.95) if subtitle else Inches(2.55)
+    zone_y    = _content_y(meta, subtitle=bool(subtitle))
     zone_w    = Inches(12.2)
     label_w   = Inches(4.20)
     opt_w     = (zone_w - label_w) / n_opts

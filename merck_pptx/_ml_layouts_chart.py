@@ -37,7 +37,7 @@ from ._ml_chrome import (
     _tracked, _track_letters, _format_section_number, _pad_int,
     _render_action_title, _source_line,
     statement_card, in_slide_section,
-    _takeaway_band, _superscript,
+    _takeaway_band, _superscript, _content_y,
 )
 from ._ml_charts import (
     add_slope_chart, add_dot_plot, add_marimekko, add_waterfall,
@@ -216,7 +216,7 @@ def build_waterfall_slide(prs, meta, action_title=None, bars=None, takeaway=None
                  subtitle=subtitle,
                  takeaway=takeaway, source=source, page=page, total=total,
                  palette=style, section_number=section_number, methodology_note=methodology_note)
-    chart_y = Inches(2.95) if subtitle else Inches(2.55)
+    chart_y = _content_y(meta, subtitle=bool(subtitle))
     chart_h = Inches(6.50) - chart_y
     add_waterfall(slide, Inches(0.65), chart_y, Inches(12.0), chart_h,
                   bars or [], style)
@@ -314,7 +314,7 @@ def build_stat_strip(prs, meta, action_title=None, stats=None, takeaway=None,
         cards = cards[:4]
     n = len(cards)
 
-    zone_top = Inches(2.95) if subtitle else Inches(2.50)
+    zone_top = _content_y(meta, subtitle=bool(subtitle))
     card_h = Inches(2.40)
     gutter = Inches(0.18)
     total_w = CONTENT_W
@@ -510,7 +510,7 @@ def build_risk_heatmap(prs, meta, action_title=None, risks=None,
     # can reach ~1.90).  Use the same subtitle-aware offset other layouts use.
     GRID_N  = 5
     grid_x  = Inches(1.60)
-    grid_y  = Inches(2.55) if not subtitle else Inches(2.95)
+    grid_y  = _content_y(meta, subtitle=bool(subtitle))
     grid_w  = Inches(6.20)
     # Bottom boundary: leave room for takeaway bar (~0.55) + source (~0.35).
     grid_h  = Inches(6.50) - grid_y - Inches(0.90)

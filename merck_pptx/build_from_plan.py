@@ -99,13 +99,11 @@ _TEMPLATES = {
 
 def _resolve_template(region: str, color_theme: str,
                       division: str = "merck") -> pathlib.Path:
-    """Return the best-matching base template for (region, division).
-
-    color_theme is intentionally ignored here — themes are applied
-    programmatically by _apply_color_theme() after the template is loaded,
-    so only one file per (region, division) pair is needed.
+    """Return the best-matching base template for (region, color_theme, division).
 
     Lookup order:
+    0. empower BinaryFile registry — exact per-theme PPTX (EU/global only; USA
+       keeps its own legal-compliance template).  Requires empower to be installed.
     1. (region, division) from _DIVISION_TEMPLATES (if file exists on disk)
     2. (region, "merck")  — region default
     3. global default     — EU_Merck_Themed.pptx
@@ -114,6 +112,17 @@ def _resolve_template(region: str, color_theme: str,
     d = str(division or "merck").lower().strip().replace("-", "_").replace(" ", "_")
     if r in ("us", "canada"):
         r = "usa"
+
+    # 0. BinaryFile template — correct per-theme layout/design shapes baked in.
+    #    USA uses its own legally-required template (different disclaimer text).
+    if r not in ("usa",):
+        try:
+            from .binary_templates import resolve_template_path
+            bp = resolve_template_path(d, color_theme)
+            if bp is not None:
+                return bp
+        except Exception:
+            pass
 
     # 1. Division-specific template.
     fname = _DIVISION_TEMPLATES.get((r, d))
@@ -170,15 +179,17 @@ _THEME_SCHEME_OVERRIDES = {
     # For dark themes (bg = violet):
     #   dk2 = "503291" so the background rect is violet (dark) → dark slide feel
     #
-    #            accent1      dk2         accent5     lt2
-    "plastic":   ("503291", "EB3C96",  "EB3C96",  "B4DC96"),
-    "functional":("503291", "2DBECD",  "2DBECD",  "A5CD50"),
-    "organic":   ("503291", "E61E50",  "E61E50",  "FFDCB9"),
-    "synthetic": ("FFC832", "503291",  "FFC832",  "B4DC96"),
+    #             accent1    dk2        accent5    lt2        accent3
+    "plastic":   ("503291", "EB3C96",  "EB3C96",  "B4DC96",  None),
+    "functional":("503291", "2DBECD",  "2DBECD",  "A5CD50",  "2DBECD"),
+    #   functional: Rechteck 73 (main bg rect on cover) uses scheme:accent3
+    #   which must be teal so the cover panel renders correctly.
+    "organic":   ("503291", "E61E50",  "E61E50",  "FFDCB9",  None),
+    "synthetic": ("FFC832", "503291",  "FFC832",  "B4DC96",  None),
     # technical: light-theme (cream bg) — dk2/accent5 must be teal so the
     # background rectangle shows through the freeform gap in teal, not violet.
-    "technical": ("2DBECD", "2DBECD",  "2DBECD",  "FFDCB9"),
-    "electronics":("FFC832","503291",  "FFC832",  "B4DC96"),
+    "technical": ("2DBECD", "2DBECD",  "2DBECD",  "FFDCB9",  None),
+    "electronics":("FFC832","503291",  "FFC832",  "B4DC96",  None),
 }
 
 # Hardcoded background hex values found in the EU and USA template layout shapes.
@@ -224,7 +235,8 @@ def _apply_color_theme(prs, color_theme: str) -> None:
     if not overrides:
         return   # unknown theme — leave template colors unchanged
 
-    a1, dk2, a5, lt2 = overrides
+    a1, dk2, a5, lt2 = overrides[:4]
+    a3 = overrides[4] if len(overrides) > 4 else None
 
     # ------------------------------------------------------------------
     # 1. Modify the theme color scheme in the slide master's theme part.
@@ -273,6 +285,8 @@ def _apply_color_theme(prs, color_theme: str) -> None:
                 _set_scheme_color(clr_scheme, "dk2",     dk2)
                 _set_scheme_color(clr_scheme, "accent5", a5)
                 _set_scheme_color(clr_scheme, "lt2",     lt2)
+                if a3 is not None:
+                    _set_scheme_color(clr_scheme, "accent3", a3)
                 # Write the modified XML back as bytes.
                 # standalone=True is lxml-only; stdlib ET ignores the kwarg.
                 _ts_kw = {"standalone": True} if _HAS_LXML else {}

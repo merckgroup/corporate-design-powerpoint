@@ -1,0 +1,11 @@
+{
+  "_comment": "Maps (division, color_theme) to empower BinaryFile UID. Run 'python -m merck_pptx discover-templates' to find and register additional UIDs for other divisions.",
+  "merck": {
+    "plastic":     "3602214c-15c6-4132-a2c7-eadbbb3c1279",
+    "functional":  "d1c34b6f-9d6d-4de0-b97f-81d093db01b7",
+    "organic":     "131b853d-e559-4bad-b753-ac7735622df6",
+    "synthetic":   "651fa373-badd-452b-a208-4a55f7596717",
+    "technical":   "b46b3c65-5eac-4c24-99bd-6dd953e7bcad",
+    "electronics": "355a4c87-ee66-42c4-91e1-8d7f683c6c62"
+  }
+}

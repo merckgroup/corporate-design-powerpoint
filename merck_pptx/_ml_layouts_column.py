@@ -36,7 +36,7 @@ from ._ml_chrome import (
     _tracked, _track_letters, _format_section_number, _pad_int,
     _render_action_title, _source_line,
     statement_card, in_slide_section,
-    _takeaway_band, _superscript, _callout_block,
+    _takeaway_band, _superscript, _callout_block, _content_y,
 )
 from ._ml_charts import (
     add_slope_chart, add_dot_plot, add_marimekko, add_waterfall,
@@ -208,7 +208,7 @@ def build_two_column(prs, meta, action_title=None, left=None, right=None, takeaw
                  takeaway=takeaway, source=source, page=page, total=total,
                  palette=style, section_number=section_number,
                  methodology_note=methodology_note)
-    zone_top = Inches(2.95) if subtitle else Inches(2.55)
+    zone_top = _content_y(meta, subtitle=bool(subtitle))
     zone_h = Inches(6.50) - zone_top
     gap = Inches(0.30)
     col_w = (Inches(12.0) - gap) / 2
@@ -240,7 +240,7 @@ def build_three_column(prs, meta, action_title=None, columns=None, takeaway=None
     cols = (columns or [])[:3]
     while len(cols) < 3:
         cols.append({})
-    zone_top = Inches(2.95) if subtitle else Inches(2.55)
+    zone_top = _content_y(meta, subtitle=bool(subtitle))
     zone_h = Inches(6.50) - zone_top
     gap = Inches(0.25)
     col_w = (Inches(12.0) - gap * 2) / 3
@@ -278,7 +278,7 @@ def build_vertical_numbered(prs, meta, action_title=None, items=None, takeaway=N
     # don't overflow into adjacent rows.
     num_sz   = 34 if n >= 5 else (38 if n == 4 else 44)
     title_sz = 13 if n >= 5 else (14 if n == 4 else 15)
-    zone_top = Inches(2.95) if subtitle else Inches(2.55)
+    zone_top = _content_y(meta, subtitle=bool(subtitle))
     zone_h = Inches(6.50) - zone_top
     gap = Inches(0.12)
     row_h = (zone_h - gap * (n - 1)) / n
@@ -332,7 +332,7 @@ def build_four_column(prs, meta, action_title=None, columns=None, takeaway=None,
     cols = (columns or [])[:4]
     while len(cols) < 4:
         cols.append({})
-    zone_top = Inches(2.55) if not subtitle else Inches(2.95)
+    zone_top = _content_y(meta, subtitle=bool(subtitle))
     zone_h = Inches(6.30) - zone_top
     gap = Inches(0.18)
     col_w = (Inches(12.0) - gap * 3) / 4
@@ -377,7 +377,7 @@ def build_label_rows(prs, meta, action_title=None, rows=None, takeaway=None,
 
     rs = list(rows or [])[:6]
     n = max(len(rs), 1)
-    zone_top = Inches(2.55) if not subtitle else Inches(2.95)
+    zone_top = _content_y(meta, subtitle=bool(subtitle))
     zone_h = SOURCE_Y - zone_top - Inches(0.20)
     gap = Inches(0.14)
     row_h = (zone_h - gap * (n - 1)) / n
