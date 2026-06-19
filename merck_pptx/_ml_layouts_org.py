@@ -145,7 +145,14 @@ def build_status_table(prs, meta, action_title=None, columns=None, rows=None, ta
                 if _norm_key(k) == col_key:
                     val = v
                     break
-            if not val:
+            if val == "":
+                # Substring fallback: match if either key contains the other
+                for k, v in row.items():
+                    nk = _norm_key(k)
+                    if nk and col_key and (nk in col_key or col_key in nk):
+                        val = v
+                        break
+            if val == "":
                 # Fallback to first-word match or exact-lowercase match.
                 _parts = str(c).strip().lower().split() if c else []
                 first_word = _parts[0] if _parts else ""
@@ -220,14 +227,15 @@ def build_hub_spoke(prs, meta, action_title=None, hub=None, spokes=None, takeawa
                  section_number=section_number,
                  methodology_note=methodology_note)
 
-    sp = list(spokes or [])[:4]
+    sp = list(spokes or [])[:8]
+    n_sp = len(sp)
 
-    # Center hub oval.
+    # Center hub oval — use theme accent
     hub_w = Inches(2.80)
     hub_h = Inches(2.00)
     hub_x = Inches(13.333) / 2 - hub_w / 2
     hub_y = Inches(4.55) - hub_h / 2
-    hub_shape = oval(slide, hub_x, hub_y, hub_w, hub_h, fill=MERCK_PURPLE)
+    hub_shape = oval(slide, hub_x, hub_y, hub_w, hub_h, fill=pal["accent"])
     _apply_border(hub_shape, pal["highlight"], Pt(2.25))
 
     # Hub contents.
@@ -248,21 +256,31 @@ def build_hub_spoke(prs, meta, action_title=None, hub=None, spokes=None, takeawa
             str(hub_sub), sz=11, color=WHITE, italic=True,
             font=FONT_BODY, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
 
-    # Four corner cards.
+    # Dynamic positions: distribute cards evenly
+    # For 1-4: corners; for 5-8: add mid-side positions
     card_w = Inches(3.40)
     card_h = Inches(1.55)
-    positions = [
-        (Inches(0.55), Inches(3.20)),                   # top-left
-        (Inches(13.333) - Inches(0.55) - card_w,        # top-right
-         Inches(3.20)),
-        (Inches(0.55), Inches(5.40)),                   # bottom-left
-        (Inches(13.333) - Inches(0.55) - card_w,        # bottom-right
-         Inches(5.40)),
+    MARGIN_X = Inches(0.30)
+    MARGIN_Y = Inches(2.50)
+    ZONE_BOT = Inches(6.80)
+    RIGHT_X  = Inches(13.333) - MARGIN_X - card_w
+
+    all_positions = [
+        (MARGIN_X,  MARGIN_Y),                          # 0 top-left
+        (RIGHT_X,   MARGIN_Y),                          # 1 top-right
+        (MARGIN_X,  ZONE_BOT - card_h),                 # 2 bottom-left
+        (RIGHT_X,   ZONE_BOT - card_h),                 # 3 bottom-right
+        (MARGIN_X,  (MARGIN_Y + ZONE_BOT - card_h)/2),  # 4 mid-left
+        (RIGHT_X,   (MARGIN_Y + ZONE_BOT - card_h)/2),  # 5 mid-right
+        ((Inches(13.333) - card_w)/2, MARGIN_Y),         # 6 top-center
+        ((Inches(13.333) - card_w)/2, ZONE_BOT - card_h),# 7 bottom-center
     ]
+    positions = all_positions[:max(n_sp, 1)]
+
     hub_cx = hub_x + hub_w / 2
     hub_cy = hub_y + hub_h / 2
     for i, item in enumerate(sp):
-        if i >= 4:
+        if i >= len(positions):
             break
         cx, cy = positions[i]
         card = rounded(slide, cx, cy, card_w, card_h, fill=pal["panel"])
@@ -273,7 +291,7 @@ def build_hub_spoke(prs, meta, action_title=None, hub=None, spokes=None, takeawa
         pad = Inches(0.22)
         txt(slide, cx + pad, cy + Inches(0.20),
             card_w - pad * 2, Inches(0.45),
-            str(item.get("title", "")), sz=13, color=MERCK_PURPLE, bold=True,
+            str(item.get("title", "")), sz=13, color=pal["accent"], bold=True,
             font=FONT_BODY)
         txt(slide, cx + pad, cy + Inches(0.72),
             card_w - pad * 2, card_h - Inches(0.80),
@@ -415,7 +433,7 @@ def build_org_chart(prs, meta, action_title, root, children,
     root_cx = root_x + root_w / 2   # horizontal centre of root
 
     root_box = rounded(slide, root_x, root_y, root_w, root_h,
-                       fill=MERCK_PURPLE, adj=6000)
+                       fill=pal["accent"], adj=6000)
     txt(slide, root_x, root_y, root_w, root_h,
         str(root.get("name", "")),
         sz=13, color=WHITE, bold=True,
@@ -467,7 +485,7 @@ def build_org_chart(prs, meta, action_title, root, children,
                 fill=PANEL_LIGHT, adj=6000)
         txt(slide, child_x, child_y, child_w, child_h,
             str(child.get("name", "")),
-            sz=11, color=MERCK_PURPLE, bold=True,
+            sz=11, color=pal["accent"], bold=True,
             align=PP_ALIGN.CENTER, font=FONT_BODY,
             anchor=MSO_ANCHOR.MIDDLE)
 
@@ -573,7 +591,7 @@ def build_topic_set(prs, meta, action_title, topics, takeaway="", source=None,
             # Circle centred horizontally on the card
             circ_x = card_x + card_w / 2 - circle_r
             circ_y = row_y
-            circle(slide, circ_x, circ_y, circle_size, fill=MERCK_PURPLE)
+            circle(slide, circ_x, circ_y, circle_size, fill=pal["accent"])
 
             # Number or icon inside circle
             icon_name = topic.get("icon")
@@ -608,7 +626,7 @@ def build_topic_set(prs, meta, action_title, topics, takeaway="", source=None,
             title_h = Inches(0.36)
             txt(slide, card_x, cursor_y, card_w, title_h,
                 str(topic.get("title", "")),
-                sz=13, color=MERCK_PURPLE, bold=True,
+                sz=13, color=pal["accent"], bold=True,
                 align=PP_ALIGN.CENTER, font=FONT_BODY,
                 anchor=MSO_ANCHOR.TOP)
             cursor_y += title_h + Inches(0.08)
@@ -663,7 +681,7 @@ def build_kpi_dashboard(prs, meta, action_title=None, kpis=None,
 
     dark      = _is_dark(style)
     card_fill = PURPLE_DEEP if dark else PANEL_LIGHT
-    val_color = MERCK_YELLOW if dark else MERCK_PURPLE
+    val_color = pal["hot"]    if dark else pal["accent"]
     lab_color = PANEL_LIGHT  if dark else INK_DARK
     ctx_color = PANEL_LIGHT  if dark else INK_GRAY
     RAG       = {"green": GOOD_GREEN, "amber": MERCK_YELLOW, "red": BAD_RED}
@@ -798,10 +816,18 @@ def build_icon_grid(prs, meta, action_title=None, items=None,
         rounded(slide, cx, cy, card_w, card_h, fill=card_fill)
         icon_cx, icon_cy = cx + Inches(0.22), cy + Inches(0.20)
         circle(slide, icon_cx, icon_cy, icon_sz, fill=icon_bg)
-        txt(slide, icon_cx, icon_cy, icon_sz, icon_sz,
-            str(item.get("icon", "●")),
-            sz=18, color=WHITE, font=FONT_BODY,
-            align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+        icon_name = str(item.get("icon", ""))
+        if icon_name and icon_name in ICON_REGISTRY:
+            margin = icon_sz * 0.18
+            draw_icon(slide, icon_name,
+                      icon_cx + margin, icon_cy + margin,
+                      icon_sz - margin * 2, color=WHITE)
+        else:
+            # Fallback: render as emoji / short text
+            txt(slide, icon_cx, icon_cy, icon_sz, icon_sz,
+                icon_name or "●",
+                sz=18, color=WHITE, font=FONT_BODY,
+                align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
         txt(slide,
             icon_cx + icon_sz + Inches(0.12), icon_cy,
             card_w - icon_sz - Inches(0.46), icon_sz,

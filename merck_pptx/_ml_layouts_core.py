@@ -590,9 +590,14 @@ def build_section_divider(prs, meta, number=None, title=None, style="merck_execu
     accent_color  = pal["highlight"]            # was hardcoded MERCK_GOLD
 
     # Huge serif number at left.
-    txt(slide, Inches(0.65), Inches(1.80), Inches(5.0), Inches(3.20),
-        str(num_str or number or ""), sz=140, color=number_color, bold=True,
-        font=FONT_HEAD, anchor=MSO_ANCHOR.MIDDLE)
+    _num_box = txt(slide, Inches(0.65), Inches(1.80), Inches(5.0), Inches(3.20),
+                   str(num_str or number or ""), sz=96, color=number_color, bold=True,
+                   font=FONT_HEAD, anchor=MSO_ANCHOR.MIDDLE)
+    try:
+        from pptx.enum.text import MSO_AUTO_SIZE as _AS
+        _num_box.text_frame.auto_size = _AS.TEXT_TO_FIT_SHAPE
+    except Exception:
+        pass
     # Title to the right (uppercase tracking-wide).
     txt(slide, Inches(5.50), Inches(3.10), Inches(7.5), Inches(0.40),
         _tracked(title), sz=13, color=accent_color, bold=True, font=FONT_BODY,

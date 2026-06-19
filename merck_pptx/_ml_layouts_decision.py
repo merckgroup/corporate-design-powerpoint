@@ -142,7 +142,7 @@ def build_2x2_matrix(prs, meta, action_title=None, x_axis=None, y_axis=None, qua
         q = (quadrants or {}).get(key, {})
         highlighted = bool(q.get("highlighted"))
         if highlighted:
-            quad_fill = PURPLE_DEEP if _is_dark(style) else MERCK_PURPLE
+            quad_fill = pal["accent_2"] if _is_dark(style) else pal["accent"]
             rounded(slide, cx, cy, cell_w, cell_h, fill=quad_fill)
             rounded(slide, cx, cy, cell_w, Inches(0.06), fill=pal["hot"], adj=50000)
             tcolor = WHITE
@@ -276,7 +276,8 @@ def build_decision_rows(prs, meta, action_title=None, decisions=None, takeaway=N
     callout = (content or {}).get("callout")
     if isinstance(callout, dict):
         _callout_block(slide, callout.get("type", "conclusion"),
-                       callout.get("text", ""), pal)
+                       callout.get("text", ""), pal,
+                       has_takeaway=bool(takeaway))
     return slide
 
 
@@ -437,13 +438,14 @@ def build_comparison_table(prs, meta, action_title=None, options=None,
         "partial": ("∼", MERCK_YELLOW),
     }
 
-    zone_x, zone_y = Inches(0.55), Inches(1.62)
-    zone_w         = Inches(12.2)
-    label_w        = Inches(4.20)
-    opt_w          = (zone_w - label_w) / n_opts
-    header_h       = Inches(0.52)
-    row_h          = max((Inches(4.72) - header_h) / max(len(features), 1),
-                        Inches(0.30))
+    zone_x    = Inches(0.55)
+    zone_y    = Inches(2.95) if subtitle else Inches(2.55)
+    zone_w    = Inches(12.2)
+    label_w   = Inches(4.20)
+    opt_w     = (zone_w - label_w) / n_opts
+    header_h  = Inches(0.52)
+    avail_h   = SOURCE_Y - zone_y - header_h - Inches(0.15)
+    row_h     = max(avail_h / max(len(features), 1), Inches(0.30))
 
     rect(slide, zone_x, zone_y, label_w, header_h, fill=PURPLE_DEEP)
     for j, opt in enumerate(options):

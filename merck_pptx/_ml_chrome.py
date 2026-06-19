@@ -267,7 +267,9 @@ def _render_action_title(slide, x, y, w, h, content, palette,
     if italic_color is None:
         italic_color = pal["hot"]
 
-    box = slide.shapes.add_textbox(x, y, w, h)
+    # Allow up to 1.50" for long titles (> 80 chars)
+    _h = Inches(1.50) if isinstance(content, str) and len(content) > 80 else h
+    box = slide.shapes.add_textbox(x, y, w, _h)
     tf = box.text_frame
     tf.word_wrap = True
     tf.vertical_anchor = MSO_ANCHOR.TOP
@@ -820,14 +822,17 @@ _CALLOUT_GLYPHS = {
 }
 
 
-def _callout_block(slide, ctype, text, pal, y_top=None):
+def _callout_block(slide, ctype, text, pal, y_top=None, has_takeaway=False):
     """Render a branded bottom-callout decorator below content.
 
     ctype: 'conclusion' | 'result' | 'next' | 'future'
-    Snaps to just above the footer by default.
+    has_takeaway: if True, positions callout above the takeaway band instead of above the footer.
     """
     if y_top is None:
-        y_top = FOOTER_Y - Inches(0.58)
+        if has_takeaway:
+            y_top = TAKEAWAY_Y - Inches(0.52)
+        else:
+            y_top = SOURCE_Y - Inches(0.52)
     icon_w = Inches(0.44)
     full_h = Inches(0.44)
     glyph  = _CALLOUT_GLYPHS.get(str(ctype).lower(), ">>")

@@ -407,7 +407,8 @@ def build_label_rows(prs, meta, action_title=None, rows=None, takeaway=None,
     callout = (content or {}).get("callout")
     if isinstance(callout, dict):
         _callout_block(slide, callout.get("type", "conclusion"),
-                       callout.get("text", ""), pal)
+                       callout.get("text", ""), pal,
+                       has_takeaway=bool(takeaway))
     return slide
 
 

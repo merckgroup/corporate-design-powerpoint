@@ -339,7 +339,7 @@ def build_stat_strip(prs, meta, action_title=None, stats=None, takeaway=None,
             val_sz, num_h = 32, Inches(0.72)
         num_y = cy + Inches(0.30)
         txt(slide, cx + pad, num_y, card_w - pad * 2, num_h,
-            val_str, sz=val_sz, color=MERCK_PURPLE, bold=True,
+            val_str, sz=val_sz, color=pal["accent"], bold=True,
             font=FONT_HEAD, anchor=MSO_ANCHOR.TOP)
 
         # Tracked uppercase label in theme accent.

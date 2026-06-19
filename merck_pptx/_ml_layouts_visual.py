@@ -122,6 +122,12 @@ def build_word_cloud(prs, meta, action_title=None, words=None,
         color  (tuple, opt) — explicit color override
     """
     pal = _palette_for(style)
+    ACC  = pal["accent"]
+    HOT  = pal["hot"]
+    HLT  = pal["highlight"]
+    INK  = pal["ink"]
+    INK2 = pal["ink_2"]
+    dark = _is_dark(style)
     slide = _new_slide(prs, bg_color=pal["bg"])
     apply_chrome(slide, meta, action_title, category=category,
                  takeaway=takeaway, source=source, subtitle=subtitle,
@@ -133,25 +139,38 @@ def build_word_cloud(prs, meta, action_title=None, words=None,
     if not words:
         return slide
 
-    WORD_COLORS = [MERCK_PURPLE, MERCK_BLUE, MERCK_GOLD,
-                   GOOD_GREEN, PURPLE_MUTED, MERCK_AQUA, BAD_RED]
+    WORD_COLORS = [ACC, HLT, HOT, pal["accent_2"], pal["accent_3"], pal["muted"]]
+
+    # Dynamic grid: fill the full content zone (not hard-coded y=1.72)
+    _zone_top = Inches(2.95) if subtitle else Inches(2.55)
+    _zone_bot = SOURCE_Y - Inches(0.10)
+    _zone_h   = _zone_bot - _zone_top
+    _GRID_ROWS, _GRID_COLS = 5, 6
+    _row_h   = _zone_h / _GRID_ROWS
+    _col_w   = CONTENT_W / _GRID_COLS
     GRID = [
-        (0.75, 1.72), (2.50, 1.72), (4.40, 1.72), (6.30, 1.72), (8.20, 1.72), (10.10, 1.72),
-        (0.55, 2.68), (2.20, 2.60), (4.00, 2.55), (5.90, 2.68), (7.80, 2.55), (9.90, 2.60),
-        (0.80, 3.50), (2.60, 3.44), (4.50, 3.58), (6.20, 3.44), (8.10, 3.50), (10.00, 3.44),
-        (0.60, 4.36), (2.30, 4.28), (4.20, 4.44), (6.00, 4.28), (7.90, 4.36), (9.80, 4.44),
-        (1.20, 5.18), (3.10, 5.10), (5.00, 5.24), (6.80, 5.10), (8.60, 5.18), (10.40, 5.10),
+        (CONTENT_X + c * _col_w + _col_w * 0.08 + (r % 2) * _col_w * 0.06,
+         _zone_top  + r * _row_h + _row_h  * 0.12)
+        for r in range(_GRID_ROWS)
+        for c in range(_GRID_COLS)
     ]
 
     for i, word in enumerate(words):
         if i >= len(GRID):
             break
         gx, gy = GRID[i]
-        weight  = max(1.0, min(5.0, float(word.get("weight") or 2)))
-        sz      = int(10 + weight * 5)
-        col     = word.get("color") or WORD_COLORS[i % len(WORD_COLORS)]
-        txt(slide, Inches(gx), Inches(gy), Inches(2.20), Inches(0.46),
-            str(word.get("text", "")),
+        # Accept plain strings or dicts
+        if isinstance(word, str):
+            word_text = word
+            weight = 2.0
+            col = WORD_COLORS[i % len(WORD_COLORS)]
+        else:
+            weight  = max(1.0, min(5.0, float(word.get("weight") or 2)))
+            col     = word.get("color") or WORD_COLORS[i % len(WORD_COLORS)]
+            word_text = str(word.get("text", ""))
+        sz = int(10 + weight * 5)
+        txt(slide, gx, gy, Inches(2.20), Inches(0.46),
+            word_text,
             sz=sz, color=col, bold=(weight >= 4.0),
             font=FONT_HEAD if weight >= 4 else FONT_BODY,
             align=PP_ALIGN.LEFT)
@@ -197,7 +216,7 @@ def build_pyramid(prs, meta, action_title=None, tiers=None,
     max_w   = Inches(6.50)
     taper   = max_w / (n + 1)
 
-    TIER_COLORS = [MERCK_PURPLE, MERCK_BLUE, PURPLE_MUTED, MERCK_AQUA, LIGHT_GRAY]
+    TIER_COLORS = [pal["accent"], pal["accent_2"], pal["accent_3"], pal["muted"], pal["rule"]]
 
     for i, tier in enumerate(tiers):
         level = i if orientation == "up" else (n - 1 - i)
@@ -257,7 +276,7 @@ def build_venn(prs, meta, action_title=None, circles=None,
         return slide
 
     dark = _is_dark(style)
-    CIRC_COLORS = [MERCK_PURPLE, MERCK_BLUE, MERCK_GOLD]
+    CIRC_COLORS = [pal["accent"], pal["accent_2"], pal["accent_3"], pal["highlight"]]
     r = Inches(2.10)
 
     n = len(circles)
@@ -272,6 +291,10 @@ def build_venn(prs, meta, action_title=None, circles=None,
                    for a in (210, 330, 90)]
         cy_list = [base_cy + tri_r * _math.sin(_math.radians(a))
                    for a in (210, 330, 90)]
+
+    label_color = WHITE if dark else INK_DARK
+    group_cx = sum(cx_list[:n]) / n
+    group_cy = sum(cy_list[:n]) / n
 
     for i, circ in enumerate(circles):
         col = circ.get("color") or CIRC_COLORS[i % len(CIRC_COLORS)]
@@ -292,10 +315,25 @@ def build_venn(prs, meta, action_title=None, circles=None,
         except Exception:
             pass
 
-        txt(slide, ccx - r, ccy - r - Inches(0.36), r * 2, Inches(0.30),
+        # Radial label: push outward from the group centroid so the top-circle
+        # label never flies off the slide (RCA-10).
+        import math as _m
+        dx = ccx - group_cx
+        dy = ccy - group_cy
+        dist = _m.hypot(dx, dy)
+        if dist > 0:
+            ux, uy = dx / dist, dy / dist
+        else:
+            ux, uy = 0.0, -1.0
+        lbl_cx = ccx + ux * (r + Inches(0.12))
+        lbl_cy = ccy + uy * (r + Inches(0.04)) - Inches(0.15)
+        # clamp to slide safe zone
+        lbl_cx = max(CONTENT_X, min(lbl_cx, CONTENT_X + CONTENT_W - r * 2))
+        lbl_cy = max(Inches(1.20), min(lbl_cy, SOURCE_Y - Inches(0.32)))
+        txt(slide, lbl_cx - r, lbl_cy, r * 2, Inches(0.30),
             str(circ.get("label", "")),
-            sz=11, color=WHITE if dark else INK_DARK, bold=True,
-            font=FONT_BODY, align=PP_ALIGN.CENTER)
+            sz=10, color=label_color, bold=True, font=FONT_BODY,
+            align=PP_ALIGN.CENTER)
 
         if circ.get("body"):
             txt(slide, ccx - r * 0.7, ccy - Inches(0.26),
@@ -345,8 +383,8 @@ def build_layered_stack(prs, meta, action_title=None, layers=None,
     if not layers:
         return slide
 
-    L_COLORS = [MERCK_PURPLE, MERCK_BLUE, PURPLE_MUTED,
-                 MERCK_AQUA, GOOD_GREEN, MERCK_GOLD, LIGHT_GRAY]
+    L_COLORS = [pal["accent"], pal["accent_2"], pal["accent_3"],
+                 pal["highlight"], pal["muted"], pal["hot"], pal["rule"]]
     zone_x, zone_y = Inches(0.55), Inches(1.65)
     zone_w, zone_h = Inches(12.2), Inches(4.62)
     gap = Inches(0.10)
@@ -446,10 +484,10 @@ def build_photo_text(prs, meta, action_title=None, image_path=None,
                                      _emu(panel_w), _emu(zone_h))
         except Exception:
             _draw_img_placeholder(slide, img_x, zone_y, panel_w, zone_h,
-                                  image_label, dark)
+                                  image_label, dark, pal=pal)
     else:
         _draw_img_placeholder(slide, img_x, zone_y, panel_w, zone_h,
-                              image_label, dark)
+                              image_label, dark, pal=pal)
 
     y_cur = zone_y + Inches(0.14)
     if title:
@@ -473,13 +511,15 @@ def build_photo_text(prs, meta, action_title=None, image_path=None,
     return slide
 
 
-def _draw_img_placeholder(slide, x, y, w, h, label, dark):
-    """Grey placeholder rectangle when no image file is provided."""
-    fill = (0x55, 0x55, 0x66) if dark else (0xCC, 0xCC, 0xDD)
+def _draw_img_placeholder(slide, x, y, w, h, label, dark, pal=None):
+    """Branded placeholder rectangle when no image file is provided."""
+    fill = pal["panel"] if pal else ((0x55, 0x55, 0x66) if dark else (0xCC, 0xCC, 0xDD))
+    text_color = pal["muted"] if pal else WHITE
     rect(slide, x, y, w, h, fill=fill)
+    display_label = ("[Image]  " + str(label)) if label else "[Image]"
     txt(slide, x, y + h / 2 - Inches(0.28), w, Inches(0.48),
-        str(label) if label else "[ Image ]",
-        sz=12, color=WHITE, italic=True, font=FONT_BODY,
+        display_label,
+        sz=13, color=text_color, italic=True, font=FONT_BODY,
         align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
 
 
@@ -522,11 +562,11 @@ def build_fishbone(prs, meta, action_title=None, effect=None, bones=None,
     effect_h  = Inches(0.90)
 
     # Spine
-    line(slide, spine_x1, mid_y, spine_x2, mid_y, MERCK_GOLD, Pt(3))
+    line(slide, spine_x1, mid_y, spine_x2, mid_y, pal["highlight"], Pt(3))
 
     # Effect box at right end
     rounded(slide, spine_x2 - effect_w / 2, mid_y - effect_h / 2,
-            effect_w, effect_h, fill=MERCK_PURPLE)
+            effect_w, effect_h, fill=pal["accent"])
     txt(slide, spine_x2 - effect_w / 2, mid_y - effect_h / 2,
         effect_w, effect_h, str(effect or "Effect"),
         sz=12, color=WHITE, bold=True, font=FONT_BODY,
@@ -544,17 +584,18 @@ def build_fishbone(prs, meta, action_title=None, effect=None, bones=None,
         if not n_grp:
             continue
         step = usable / n_grp
+        # Dynamic label width: never wider than step minus a 0.20" gutter (RCA-09)
+        lbl_w = min(Inches(2.00), step - Inches(0.20))
+        lbl_h = Inches(0.36)
         for k, bone in enumerate(group):
             bx      = spine_x1 + Inches(0.60) + k * step + step / 2
             bone_y  = mid_y + sign * Inches(1.40)
             meet_x  = bx + Inches(0.40) * sign * -1
             # Diagonal branch to spine
-            line(slide, bx, bone_y, meet_x, mid_y, MERCK_PURPLE, Pt(1.5))
+            line(slide, bx, bone_y, meet_x, mid_y, pal["highlight"], Pt(1.5))
             # Category label
-            lbl_w = Inches(2.00)
-            lbl_h = Inches(0.34)
             lbl_y = bone_y - lbl_h if sign < 0 else bone_y
-            rounded(slide, bx - lbl_w / 2, lbl_y, lbl_w, lbl_h, fill=MERCK_PURPLE)
+            rounded(slide, bx - lbl_w / 2, lbl_y, lbl_w, lbl_h, fill=pal["accent"])
             txt(slide, bx - lbl_w / 2, lbl_y, lbl_w, lbl_h,
                 str(bone.get("label", "")),
                 sz=9, color=WHITE, bold=True, font=FONT_BODY,

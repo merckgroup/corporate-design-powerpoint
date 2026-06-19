@@ -322,7 +322,11 @@ def build_gantt(prs, meta, action_title=None, rows=None, quarters=None, takeaway
         if bar_x + bar_w > grid_x + grid_w:
             bar_w = grid_x + grid_w - bar_x
         bar_w = max(bar_w, Inches(0.10))
-        tone_color = _tone_color(r.get("tone", "neutral"), style)
+        raw_tone = r.get("tone", "")
+        if raw_tone and raw_tone.lower() not in ("neutral", ""):
+            tone_color = _tone_color(raw_tone, style)
+        else:
+            tone_color = pal["accent"]
         pad = Inches(0.10)
         rect(slide, bar_x, ry + pad, bar_w, row_h - pad * 2, fill=tone_color)
     return slide
@@ -402,7 +406,7 @@ def build_milestone_timeline(prs, meta, action_title=None, milestones=None, take
         s_left = statuses[i]
         s_right = statuses[i + 1]
         if s_left == "done" and (s_right in ("done", "current")):
-            line_color = MERCK_PURPLE
+            line_color = pal["accent"]
         else:
             line_color = LIGHT_GRAY
         rect(slide, cx1 + circle_d / 2, line_y + circle_d / 2 - Emu(int(Pt(1.0))),
@@ -431,7 +435,7 @@ def build_milestone_timeline(prs, meta, action_title=None, milestones=None, take
         circle_x = col_cx - circle_d / 2
         circle_y = line_y
         if st == "done":
-            circle(slide, circle_x, circle_y, circle_d, fill=MERCK_PURPLE)
+            circle(slide, circle_x, circle_y, circle_d, fill=pal["accent"])
             _draw_check_mark(slide, circle_x, circle_y, circle_d, WHITE)
         elif st == "current":
             circle(slide, circle_x, circle_y, circle_d, fill=pal["highlight"])
@@ -693,7 +697,8 @@ def build_arrow_chain(prs, meta, action_title, steps, consequence=None,
     callout = (content or {}).get("callout")
     if isinstance(callout, dict):
         _callout_block(slide, callout.get("type", "conclusion"),
-                       callout.get("text", ""), pal)
+                       callout.get("text", ""), pal,
+                       has_takeaway=bool(takeaway))
     return slide
 
 
