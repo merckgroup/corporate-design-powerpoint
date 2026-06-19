@@ -8,7 +8,7 @@ from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Inches, Pt
 from ._ml_constants import (
-    FONT_HEAD, FONT_BODY, SLIDE_W, SLIDE_H,
+    FONT_HEAD, FONT_BODY, SLIDE_W,
     MERCK_PURPLE, MERCK_GOLD, MERCK_YELLOW, MERCK_BLUE, MERCK_AQUA,
     WHITE, INK_DARK, INK_GRAY, LIGHT_GRAY, PANEL_LIGHT,
     PURPLE_DEEP, PURPLE_MUTED, BAD_RED, GOOD_GREEN,

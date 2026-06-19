@@ -785,6 +785,7 @@ def _build_decision_rows(prs, meta, slide, total):
         source=slide.get("source"),
         subtitle=slide.get("subtitle"),
         methodology_note=c.get("methodology_note"),
+        content=c,
         **_common_kwargs(slide, meta, total),
     )
 
@@ -1017,6 +1018,7 @@ def _build_label_rows(prs, meta, slide, total):
         subtitle=slide.get("subtitle"),
         label_color=c.get("label_color"),
         methodology_note=c.get("methodology_note"),
+        content=c,
         **_common_kwargs(slide, meta, total),
     )
 

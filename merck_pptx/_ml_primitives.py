@@ -1,8 +1,12 @@
 from __future__ import annotations
+import math
 from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Emu, Inches, Pt
-from ._ml_constants import FONT_BODY, WHITE, _rgb_tuple
+from ._ml_constants import (
+    FONT_BODY, WHITE, _rgb_tuple,
+    MERCK_PURPLE, LIGHT_GRAY,
+)
 
 # ===========================================================================
 # Primitives
@@ -183,8 +187,6 @@ def draw_harvey_ball(slide, x, y, diameter, fill_pct,
     fill_pct: 0.0 = empty circle, 1.0 = completely filled circle.
     All coordinates must be EMU integers (use Inches() to convert).
     """
-    import math as _math
-    from ._ml_constants import MERCK_PURPLE, WHITE, LIGHT_GRAY
     filled_color = filled_color if filled_color is not None else MERCK_PURPLE
     empty_color  = empty_color  if empty_color  is not None else WHITE
     border_color = border_color if border_color is not None else MERCK_PURPLE
@@ -205,15 +207,15 @@ def draw_harvey_ball(slide, x, y, diameter, fill_pct,
         _apply_fill(shp, filled_color)
         return shp
 
-    # Filled pie sector as freeform polygon
-    angle_start = -_math.pi / 2                              # 12 o'clock
-    angle_end   = angle_start + 2 * _math.pi * fill_pct
+    # Filled pie sector as freeform polygon from 12 o'clock
+    angle_start = -math.pi / 2
+    angle_end   = angle_start + 2 * math.pi * fill_pct
     n_steps     = max(16, int(36 * fill_pct))
     pts = [(cx, cy)]
     for i in range(n_steps + 1):
         a = angle_start + (angle_end - angle_start) * i / n_steps
-        pts.append((int(cx + R * _math.cos(a)), int(cy + R * _math.sin(a))))
-    pts.append((cx, cy))
+        pts.append((int(cx + R * math.cos(a)), int(cy + R * math.sin(a))))
+    # _freeform_poly closes back to pts[0] (centre) automatically
     sector = _freeform_poly(slide, pts, fill=filled_color)
     return sector
 

@@ -13,7 +13,7 @@ from ._ml_constants import (
     PURPLE_DEEP, PURPLE_MUTED, BAD_RED, GOOD_GREEN,
     ACT_PURPLE, LY_CYAN, OP_LIME, FC_PINK, DEV_POS_BLUE, DEV_NEG_RED,
     CHART_PALETTE, PHASE_1_COLOR, PHASE_2_COLOR, PHASE_3_COLOR,
-    SLIDE_W, SLIDE_H,
+    SLIDE_W,
     CONTENT_X, CONTENT_Y, CONTENT_Y_SUBTITLE, CONTENT_W, CONTENT_H,
     SOURCE_Y, SOURCE_H, TAKEAWAY_Y, TAKEAWAY_H, PHASE_Y, PHASE_H,
     FOOTER_Y, FOOTER_H, FOOTER_TEXT_Y,
@@ -690,7 +690,7 @@ def build_arrow_chain(prs, meta, action_title, steps, consequence=None,
             align=PP_ALIGN.LEFT, font=FONT_BODY,
             anchor=MSO_ANCHOR.TOP)
 
-    callout = (content or {}).get("callout") if content else None
+    callout = (content or {}).get("callout")
     if isinstance(callout, dict):
         _callout_block(slide, callout.get("type", "conclusion"),
                        callout.get("text", ""), pal)
