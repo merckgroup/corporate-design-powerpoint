@@ -340,6 +340,10 @@ FOOTER_TEXT_Y = Inches(7.24)
 def _rgb_tuple(t) -> RGBColor:
     if isinstance(t, RGBColor):
         return t
+    if isinstance(t, str):
+        h = t.lstrip("#")
+        if len(h) == 6:
+            return RGBColor(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
     return RGBColor(*t)
 
 

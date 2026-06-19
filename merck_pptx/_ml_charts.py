@@ -17,7 +17,7 @@ from ._ml_primitives import (
     rect, rounded, oval, circle, line, hairline, txt, _add_run,
     _freeform_poly, _emu, _apply_fill, _apply_border,
 )
-from ._ml_chrome import apply_chrome, stub_and_flag, footnotes_block
+from ._ml_chrome import apply_chrome, stub_and_flag, footnotes_block, _tracked
 
 # ===========================================================================
 # Chart helpers

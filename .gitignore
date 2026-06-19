@@ -24,7 +24,7 @@ env/
 # Test / scratch files and generated output
 Test/
 output/
-tests/output/
+tests/
 test_output_v1/
 
 # Internal guidelines and source PDFs (not for distribution)

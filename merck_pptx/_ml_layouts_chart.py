@@ -2,6 +2,7 @@ from __future__ import annotations
 import math
 import sys
 from typing import Optional
+from pptx.enum.chart import XL_CHART_TYPE
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Emu, Inches, Pt

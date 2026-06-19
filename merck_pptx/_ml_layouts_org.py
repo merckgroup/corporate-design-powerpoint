@@ -397,7 +397,7 @@ def build_org_chart(prs, meta, action_title, root, children,
               reports (list of dicts with name/title, optional).
     Returns the slide.
     """
-    pal = PALETTES.get(style, PALETTES["merck_corporate"])
+    pal = _palette_for(style)
     slide = _new_slide(prs, bg_color=pal["bg"])
     apply_chrome(slide, meta, action_title, category=category,
                  takeaway=takeaway, source=source, subtitle=subtitle,
@@ -530,7 +530,7 @@ def build_topic_set(prs, meta, action_title, topics, takeaway="", source=None,
         icon  (str, optional) — icon name for draw_icon; if None, shows sequential number
     Returns the slide.
     """
-    pal = PALETTES.get(style, PALETTES["merck_corporate"])
+    pal = _palette_for(style)
     slide = _new_slide(prs, bg_color=pal["bg"])
     apply_chrome(slide, meta, action_title, category=category,
                  takeaway=takeaway, source=source, subtitle=subtitle,
