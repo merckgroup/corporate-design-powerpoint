@@ -1708,6 +1708,10 @@ def build_from_plan(plan, output_path, base_pptx: Optional[str] = None,
         _is_binary_template = False
     _apply_color_theme(prs, color_theme,
                        patch_hardcoded_fills=not _is_binary_template)
+    # Signal to layout builders that the template is a BinaryFile so they
+    # can skip color/font overrides on cover placeholders and let the
+    # template's own styling (font family, scheme color) show through.
+    meta["_binary_template"] = _is_binary_template
     ordered = main_slides + appendix_slides
 
     for s in ordered:

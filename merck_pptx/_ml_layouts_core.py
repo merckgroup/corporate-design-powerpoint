@@ -234,14 +234,20 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
         title_part    = title_part.strip()
         subtitle_part = subtitle_part.strip()
 
-        # Theme-dependent colors — must be computed before populating any
-        # placeholder so both title and body placeholders use the right color.
-        # The template's title placeholder defines its own scheme color that
-        # resolves to a nearly invisible tint on light-green backgrounds
-        # (functional, organic) — always override with an explicit value.
+        # BinaryFile templates carry their own font, size, and scheme-color
+        # definitions for every cover placeholder — overriding them with
+        # MERCK_PURPLE/Verdana replaces the designed Merck brand typography
+        # (e.g. "Merck" display font for synthetic, CJK variants for Asia).
+        # When using a BinaryFile, only set the text content and let the
+        # template's own styling resolve through the scheme color patches
+        # already applied by _apply_color_theme().
+        # For static fallback templates (EU_Merck_Themed.pptx etc.) the
+        # placeholder color is nearly invisible without an explicit override.
+        _binary = bool((meta or {}).get("_binary_template"))
         _cover_dark  = theme_lower in ("synthetic", "electronics")
-        _title_color = WHITE       if _cover_dark else MERCK_PURPLE
-        _body_color  = PANEL_LIGHT if _cover_dark else INK_GRAY
+        _title_color = None if _binary else (WHITE if _cover_dark else MERCK_PURPLE)
+        _body_color  = None if _binary else (PANEL_LIGHT if _cover_dark else INK_GRAY)
+        _body_font   = None if _binary else FONT_BODY
 
         ph_title = _populate_placeholder(0, slide, title_part, color=_title_color)
         if ph_title is not None and ph_title.has_text_frame:
@@ -251,16 +257,12 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
             except Exception:
                 pass
 
-        # Theme-dependent body text color for subtitle / name-date placeholders.
-        # The USA template can inherit teal from its theme master; explicitly
-        # override so these placeholders always use a CD-compliant neutral.
-        # Populate subtitle placeholder (idx 1) with subtitle_part if the
-        # slide had no explicit subtitle and the title contained a ';' split.
+        # Populate subtitle placeholder (idx 1).
         if subtitle_part and not subtitle:
             subtitle = subtitle_part
         if subtitle:
             ph_sub = _populate_placeholder(1, slide, subtitle,
-                                           font=FONT_BODY, color=_body_color)
+                                           font=_body_font, color=_body_color)
             if ph_sub is not None and ph_sub.has_text_frame:
                 ph_sub.text_frame.word_wrap = True
                 try:
@@ -280,7 +282,7 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
         nd_text = "\n".join(s for s in [name_line, date_line] if s)
         if nd_text:
             _populate_placeholder(10, slide, nd_text,
-                                  font=FONT_BODY, color=_body_color)
+                                  font=_body_font, color=_body_color)
         return slide
 
     # Fallback: no themed base. Build the cover from scratch (legacy path).
@@ -450,25 +452,21 @@ def build_agenda(prs, meta, chapters=None, style="merck_executive",
     _top_chrome(slide, meta, None, style, page=page, total=total)
     _bottom_chrome(slide, meta, "Index", page, total, style)
 
-    # Big "INDEX" title (or supplied action_title).
+    # Action title — same size / font as on all content slides so the
+    # agenda title doesn't dominate the page at 44pt Merck Web all-caps.
     dark = _is_dark(style)
     title_color = WHITE if dark else MERCK_PURPLE
     title_text = action_title if action_title else "INDEX"
-    heading_box = txt(slide, Inches(0.65), Inches(1.30), Inches(12.0), Inches(1.20),
-                      str(title_text).upper(), sz=44, color=title_color, bold=True,
-                      font=FONT_HEAD)
-    try:
-        from pptx.enum.text import MSO_AUTO_SIZE
-        heading_box.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
-    except Exception:
-        pass
+    txt(slide, Inches(0.65), Inches(0.45), Inches(12.0), Inches(1.30),
+        str(title_text), sz=22, color=title_color, bold=False,
+        font=FONT_BODY)
 
     items = (chapters or [])[:12]
     if not items:
         return slide
     # Two-column layout (left half + right half).
     half = len(items) // 2 + len(items) % 2
-    col_top = Inches(2.80)  # heading box ends at 1.30+1.20=2.50; 0.30 gap
+    col_top = _content_y(meta)  # tightly below action title, circles-aware
     col_h = Inches(3.95)
     col_w = (Inches(12.0) - Inches(0.50)) / 2
     row_gap = Inches(0.12)
@@ -618,7 +616,12 @@ def build_section_divider(prs, meta, number=None, title=None, style="merck_execu
             except Exception:
                 pass
         # Populate chapter title placeholder (idx 0 — RIGHT wide area).
-        ph0 = _populate_placeholder(0, slide, str(title))
+        # BinaryFile functional/organic dividers have accent3 (teal) title
+        # color on dark purple — very low contrast. Override with WHITE when
+        # using BinaryFile templates so the chapter title is clearly readable.
+        _binary = bool((meta or {}).get("_binary_template"))
+        _div_color = WHITE if _binary else None
+        ph0 = _populate_placeholder(0, slide, str(title), color=_div_color)
         if ph0 is not None and ph0.has_text_frame:
             ph0.text_frame.word_wrap = True
             try:
