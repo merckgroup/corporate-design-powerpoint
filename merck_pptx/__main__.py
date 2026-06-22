@@ -104,8 +104,9 @@ def _default_meta() -> dict:
         "deck_label":      "Merck Presentation",
         "classification":  "Internal",
         "month_year":      datetime.now().strftime("%B %Y"),
-        "audience":        "Executive leadership",
-        "deck_style":      "merck_executive",
+        "audience":        "Mixed audience",
+        "deck_style":      "merck_corporate",
+        "color_theme":     "organic",
         "variety_mode":    "default",
         "show_disclaimer": False,
     }

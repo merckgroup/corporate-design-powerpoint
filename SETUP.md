@@ -147,7 +147,7 @@ The `generate` command can run without any prompts in three ways:
 # 1. Provide answers as a JSON file
 python -m merck_pptx generate source.md output.pptx --meta meta.json
 
-# 2. Use built-in defaults (EU, Internal, Executive leadership, merck_executive)
+# 2. Use built-in defaults (EU, Internal, Mixed audience, merck_corporate, organic)
 python -m merck_pptx generate source.md output.pptx --defaults
 
 # 3. Pipe stdin or run in CI — defaults activate automatically when stdin is not a TTY
