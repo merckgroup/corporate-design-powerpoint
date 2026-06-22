@@ -50,7 +50,7 @@ Expected output:
 
 ```
 OK
-usage: python -m merck_pptx [-h] {generate,build} ...
+usage: python -m merck_pptx [-h] {generate,build,discover-templates,register-template} ...
 ```
 
 ---
@@ -195,9 +195,33 @@ pip install -r requirements.txt --upgrade
 
 ## Template files
 
-The pipeline ships with two templates (EU and USA defaults). Division-specific templates must be added manually.
+The pipeline resolves templates in this priority order:
 
-### Division × region file names
+1. **empower BinaryFiles** (primary) — exact per-theme PPTX files from the empower library, registered in `merck_pptx/binary_registry.json`. These carry correct per-theme design shapes baked into the layouts.
+2. **Division static templates** — `.pptx` files placed in `merck_pptx/templates/`, one per division/region combination.
+3. **Region default** — `EU_Merck_Themed.pptx` (EU) or `USA_Merck_Themed_Base_v1.pptx` (USA), both included with the package.
+
+### Registering empower BinaryFile templates (recommended)
+
+If your organisation uses empower and you have BinaryFiles installed, register them for exact per-theme rendering:
+
+```bash
+# Discover all available BinaryFile templates (grouped by color theme)
+python -m merck_pptx discover-templates
+
+# Register a specific UID for a division + color theme
+python -m merck_pptx register-template <uid> merck plastic
+python -m merck_pptx register-template <uid> emd_serono organic
+```
+
+`<uid>` is the BinaryFile identifier shown by `discover-templates` (the filename without `.pptx`). Registration is stored in `merck_pptx/binary_registry.json`.
+
+### Adding a static division template (fallback)
+
+Use this only if empower BinaryFiles are not available for your division.
+
+1. In empower, go to **Corporate Design Templates → Master Templates → {Division}** and export the master template as a `.pptx` file.
+2. Name it according to the table below and place it in `merck_pptx/templates/`.
 
 | `division` | EU template file | USA template file |
 |---|---|---|
@@ -208,14 +232,6 @@ The pipeline ships with two templates (EU and USA defaults). Division-specific t
 | `merck_asia` | `EU_MerckAsia_Themed.pptx` | `USA_MerckAsia_Themed.pptx` |
 
 If a division-specific file is missing the pipeline falls back to the region default — no error is raised.
-
-### Adding a division template
-
-1. In empower, go to **Corporate Design Templates → Master Templates → {Division}** and export the master template as a `.pptx` file.
-2. Name the file according to the table above.
-3. Place it in `merck_pptx/templates/`.
-
-The pipeline picks it up automatically on the next run.
 
 ---
 
