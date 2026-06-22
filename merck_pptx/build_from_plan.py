@@ -53,6 +53,7 @@ from merck_pptx.merck_layouts import (
     build_word_cloud, build_pyramid, build_venn, build_risk_heatmap,
     build_radar_chart, build_pros_cons, build_layered_stack,
     build_photo_text, build_key_question, build_road_to_success,
+    build_figure_panel, build_methods_box, build_sar_table, build_multi_chart,
 )
 from merck_pptx.validate_plan import validate_plan, ValidationError
 
@@ -552,8 +553,11 @@ def _resolve_style(slide: dict, meta: dict) -> str:
 
     # Auto-promote: category is the canonical trigger field; page_function is
     # the fallback so plans that set only page_function still work.
+    # Suppressed for merck_science — in a scientific report, a Risk or
+    # Recommendation slide should keep the data-first visual language, not
+    # flip to executive boardroom chrome.
     _cat = slide.get("category") or slide.get("page_function")
-    if _cat in AUTO_PROMOTE_EXECUTIVE:
+    if _cat in AUTO_PROMOTE_EXECUTIVE and style != "merck_science":
         style = "merck_executive"
     return style
 
@@ -1422,6 +1426,67 @@ def _build_fishbone(prs, meta, slide, total):
     )
 
 
+def _build_figure_panel(prs, meta, slide, total):
+    c = _content(slide)
+    return build_figure_panel(
+        prs, meta,
+        action_title=slide.get("action_title", ""),
+        panels=c.get("panels", []),
+        columns=c.get("columns", 2),
+        takeaway=slide.get("takeaway"),
+        source=slide.get("source"),
+        subtitle=slide.get("subtitle"),
+        methodology_note=c.get("methodology_note"),
+        **_common_kwargs(slide, meta, total),
+    )
+
+
+def _build_methods_box(prs, meta, slide, total):
+    c = _content(slide)
+    return build_methods_box(
+        prs, meta,
+        action_title=slide.get("action_title", ""),
+        conditions=c.get("conditions", []),
+        result=c.get("result"),
+        takeaway=slide.get("takeaway"),
+        source=slide.get("source"),
+        subtitle=slide.get("subtitle"),
+        methodology_note=c.get("methodology_note"),
+        **_common_kwargs(slide, meta, total),
+    )
+
+
+def _build_sar_table(prs, meta, slide, total):
+    c = _content(slide)
+    return build_sar_table(
+        prs, meta,
+        action_title=slide.get("action_title", ""),
+        header_groups=c.get("header_groups"),
+        columns=c.get("columns"),
+        rows=c.get("rows", []),
+        takeaway=slide.get("takeaway"),
+        source=slide.get("source"),
+        subtitle=slide.get("subtitle"),
+        methodology_note=c.get("methodology_note"),
+        **_common_kwargs(slide, meta, total),
+    )
+
+
+def _build_multi_chart(prs, meta, slide, total):
+    c = _content(slide)
+    return build_multi_chart(
+        prs, meta,
+        action_title=slide.get("action_title", ""),
+        charts=c.get("charts", []),
+        layout=c.get("layout", "1x2"),
+        takeaway=slide.get("takeaway"),
+        source=slide.get("source"),
+        subtitle=slide.get("subtitle"),
+        methodology_note=c.get("methodology_note"),
+        **_common_kwargs(slide, meta, total),
+    )
+
+
 def _build_key_question(prs, meta, slide, total):
     c = _content(slide)
     return build_key_question(
@@ -1516,6 +1581,11 @@ _DISPATCH = {
     "fishbone":           _build_fishbone,
     "key_question":       _build_key_question,
     "road_to_success":    _build_road_to_success,
+    # Science layouts
+    "figure_panel":       _build_figure_panel,
+    "methods_box":        _build_methods_box,
+    "sar_table":          _build_sar_table,
+    "multi_chart":        _build_multi_chart,
 }
 
 

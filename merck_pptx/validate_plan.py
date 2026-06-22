@@ -55,6 +55,8 @@ _VALID_LAYOUTS = frozenset({
     "key_question",
     # Process extensions
     "road_to_success",
+    # Science layouts (merck_science style)
+    "figure_panel", "methods_box", "sar_table", "multi_chart",
 })
 
 _COUNT_WORDS = {
@@ -77,7 +79,7 @@ _VALID_DIVISIONS          = frozenset({
 })
 _VALID_REGIONS            = frozenset({"eu", "usa"})
 _VALID_DECK_STYLES        = frozenset({
-    "merck_executive", "merck_corporate", "merck_storytelling",
+    "merck_executive", "merck_corporate", "merck_storytelling", "merck_science",
 })
 
 MAX_SLIDES = 150

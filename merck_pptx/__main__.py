@@ -62,12 +62,13 @@ def _ask_meta() -> dict:
         "Senior management":    "executive",
     }.get(audience, "corporate")
     style_input = input(
-        f"[5/6] Visual style (executive / corporate / storytelling) [{_style_default}]: "
+        f"[5/6] Visual style (executive / corporate / storytelling / science) [{_style_default}]: "
     ).strip().lower() or _style_default
     style_map = {
         "executive":    "merck_executive",
         "corporate":    "merck_corporate",
         "storytelling": "merck_storytelling",
+        "science":      "merck_science",
     }
     deck_style = style_map.get(style_input, "merck_executive")
 

@@ -288,7 +288,7 @@ def build_stat_strip(prs, meta, action_title=None, stats=None, takeaway=None,
     """Recall-style 3-up or 4-up stat strip with cream cards.
 
     stats: list of 3 or 4 dicts: {value, label, body}.
-      - value: hero number string in Merck Web 56pt MERCK_PURPLE bold.
+      - value: hero number string in Merck (FONT_HEAD) 56pt MERCK_PURPLE bold.
       - label: SMALL UPPERCASE TRACKED label in MERCK_GOLD Verdana 10pt.
       - body: body copy in INK_GRAY Verdana 11pt.
 

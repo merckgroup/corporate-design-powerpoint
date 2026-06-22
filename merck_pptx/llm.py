@@ -60,7 +60,7 @@ no code fences. The JSON must conform exactly to the schema below.
     "classification": "Public" | "Internal" | "Confidential",
     "month_year":     string,          // e.g. "June 2026"
     "audience":       string,
-    "deck_style":     "merck_executive" | "merck_corporate" | "merck_storytelling",
+    "deck_style":     "merck_executive" | "merck_corporate" | "merck_storytelling" | "merck_science",
     "color_theme":    "plastic" | "functional" | "organic" | "synthetic" | "technical" | "electronics",
     "variety_mode":   "default" | "creative",
     "show_disclaimer": boolean,
@@ -85,7 +85,7 @@ no code fences. The JSON must conform exactly to the schema below.
                                         // cover: "Title; Subtitle" shorthand OK
       "section_number": integer | null, // null for Cover, Agenda, Section Divider, Close,
                                         // Executive Summary, Hero Stat, Pull Quote
-      "style":          "inherit" | "merck_executive" | "merck_corporate" | "merck_storytelling",
+      "style":          "inherit" | "merck_executive" | "merck_corporate" | "merck_storytelling" | "merck_science",
       "category":       string | null,  // UPPERCASE tag e.g. "DIAGNOSIS"
       "takeaway":       string | null,  // ≤90 chars (see rule 2 and rule 7)
       "source":         string | null,
@@ -210,6 +210,24 @@ Visual / story:
   fishbone          — content: {effect: str, bones: [{label, causes:[str]}]}
                       (NOT "causes" at top level — use "bones")
 
+Science layouts (use with deck_style: "merck_science"):
+  figure_panel      — Multi-panel figure grid for experimental images or plots.
+                      content: {panels: [{label, caption, image_path}], columns: 2|3}
+                      label: single letter (A/B/C…). columns: 2 (default) or 3.
+                      Up to 6 panels. Use when showing dose-response curves, microscopy,
+                      gel images, or any multi-panel figure from a paper or report.
+  methods_box       — Experimental conditions table (left) + key result card (right).
+                      content: {conditions: [{key, value}], result: {label, value, note}}
+                      Conditions: assay format, cell line, incubation, detection, n, stats.
+                      result.value: the headline number (e.g. "IC50 = 8.3 nM").
+  sar_table         — SAR / ADMET wide data table with optional two-tier group headers.
+                      Rich format: {header_groups: [{label, columns:[str]}], rows:[{label, values:[str], highlighted}]}
+                      Simple format: {columns:[str], rows:[{label, values:[str], highlighted}]}
+                      highlighted: true marks lead compounds with a blue accent bar.
+  multi_chart       — Two or four small charts for side-by-side compound comparison.
+                      content: {charts: [{title, chart: {type, data}}], layout: "1x2"|"2x2"}
+                      Each chart entry uses the same schema as chart_slide.content.chart.
+
 ## Quality rules
 
 1. action_title must be a declarative sentence, never a noun phrase.
@@ -228,6 +246,20 @@ Visual / story:
    style="merck_executive" AND page_function to the same string:
      "Executive Summary" | "Recommendation" | "Decision Request" | "Risk" | "Tradeoff"
    The library triggers on category (not page_function) — both must agree.
+   Exception: auto-promote is suppressed for deck_style "merck_science" —
+   do NOT set style="merck_executive" for any slide in a science deck.
+
+4c. merck_science deck rules (apply ONLY when deck_style is "merck_science"):
+   - Action titles may be DESCRIPTIVE rather than declarative. A descriptive
+     title ("IC50 values: compound series B vs CDK4/6 selectivity panel") is
+     acceptable alongside the declarative form.
+   - Do NOT write takeaway text unless chrome.takeaway_bands is explicitly true.
+   - Use science-specific category tags: "METHODS" | "RESULTS" | "SAR" |
+     "ADMET" | "SELECTIVITY" | "IN VIVO" | "NEXT STEPS" | "OPEN QUESTIONS" |
+     "SUMMARY" — avoid corporate narrative tags (DIAGNOSIS, RECOMMENDATION…).
+   - Prefer figure_panel and multi_chart for data-heavy slides over text columns.
+   - The cover should list authors prominently — populate content.authors fully.
+   - Do NOT populate content.key_messages on the cover (leave empty or omit).
 
 4b. color_theme selects the Merck Corporate Design template variant. Choose
     based on the nature and audience of the source content:

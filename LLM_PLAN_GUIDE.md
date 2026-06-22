@@ -34,7 +34,7 @@ has multiple sections; omit for single-topic decks.
     "classification":  "Internal",        // REQUIRED. "Public" | "Internal" | "Confidential"
     "month_year":      "June 2026",       // REQUIRED. Displayed on cover (e.g. "June 2026").
     "audience":        "Leadership Team", // REQUIRED. Free text; informs LLM tone.
-    "deck_style":      "merck_corporate", // REQUIRED. One of the three styles (see §5).
+    "deck_style":      "merck_corporate", // REQUIRED. One of the four styles (see §5).
     "color_theme":     "plastic",         // REQUIRED. One of the six themes (see §6).
     "variety_mode":    "default",         // Optional. "default" | "creative"
     "show_disclaimer": false,             // Optional. Show legal disclaimer footer text.
@@ -85,7 +85,7 @@ Selects the divisional template. Omit unless the deck targets a specific Merck d
   "layout":         "two_column",         // One of the 44 layout keys (see §9).
   "action_title":   "Sales grew 18% YoY; digital led the gain",  // ≤120 chars (60 for cover)
   "section_number": 3,                    // integer or null (see §8)
-  "style":          "inherit",            // "inherit" | "merck_executive" | "merck_corporate" | "merck_storytelling"
+  "style":          "inherit",            // "inherit" | "merck_executive" | "merck_corporate" | "merck_storytelling" | "merck_science"
   "category":       "EVIDENCE",           // UPPERCASE tag (free text). Auto-promote trigger (see §5).
   "takeaway":       "Act now to capture share before Q3.",        // ≤120 chars
   "source":         "Internal sales data, FY2025",
@@ -107,6 +107,7 @@ Risk | Tradeoff
 1. If `deck_style` is `"merck_storytelling"` → all slides become `merck_storytelling` (overrides everything).
 2. If `style` is `"inherit"` → use `deck_style`; if no deck_style, fall back to `"merck_executive"`.
 3. Per-slide `style` overrides `"inherit"`.
+4. If `deck_style` is `"merck_science"` → auto-promote to `merck_executive` is suppressed for all slides.
 4. Auto-promote overrides step 2–3 (see §5).
 
 ---
@@ -123,6 +124,7 @@ Risk | Tradeoff
 
 **Good:** `"Revenue grew 22% YoY; digital channels drove the gain"`
 **Bad:** `"Revenue Overview"` (noun phrase — tells nothing)
+**Bad:** `"Three assets confirm pipeline strength"` when `key_messages` has 5 items — if the title states a count, it must match the content item count, or rephrase without a count (e.g., `"M-921, M-304, and M-567 confirm pipeline strength"`).
 
 ### `takeaway` (≤120 chars)
 - The one-sentence "so what" of the slide.
@@ -133,11 +135,21 @@ Risk | Tradeoff
 
 ## 5. Visual styles and auto-promote
 
-| Style | When to use | Background | Text |
-|---|---|---|---|
-| `merck_executive` | Board, C-suite, formal decisions | White | Rich Purple |
-| `merck_corporate` | General business presentations | White | Rich Purple |
-| `merck_storytelling` | Impactful narrative, bold statements | Purple | White (inverted) |
+| Style | When to use | Background | Title text | Primary accent |
+|---|---|---|---|---|
+| `merck_executive` | Board, C-suite, formal decisions | White | Rich Purple | Purple |
+| `merck_corporate` | General business presentations | White | Rich Purple | Purple |
+| `merck_storytelling` | Impactful narrative, bold statements | Purple | White (inverted) | Yellow |
+| `merck_science` | Pharma lab reports, data-first scientific slides | White | Dark ink | Blue |
+
+### `merck_science` specifics
+- Title text uses dark ink (not purple) — neutral, journal-style heading
+- Section circles are Merck Blue instead of purple
+- Takeaway bands are blue-accented; **not recommended by default** in lab reports
+- Cover omits the key_messages grid; shows prominent author byline instead
+- Section dividers use the minimal programmatic renderer (no organic blob shapes)
+- Auto-promote to `merck_executive` is **suppressed** for all slides in a science deck
+- Four exclusive layouts: `figure_panel`, `methods_box`, `sar_table`, `multi_chart`
 
 ### Auto-promote rule
 If `category` (or `page_function`) exactly matches one of these strings, the slide is
@@ -145,7 +157,8 @@ automatically promoted to `merck_executive` — even if the deck default differs
 ```
 "Executive Summary" | "Recommendation" | "Decision Request" | "Risk" | "Tradeoff"
 ```
-For these slides, also set `style: "merck_executive"` explicitly (belt-and-suspenders).
+Exception: auto-promote is suppressed when `deck_style` is `"merck_science"`.
+For non-science decks, also set `style: "merck_executive"` explicitly (belt-and-suspenders).
 
 ---
 
@@ -316,6 +329,8 @@ a slide-level field (e.g., `action_title`, `takeaway`, `source` live at the slid
   }
 }
 // If action_statement is absent, the slide falls back to action_title.
+// ⚠ ONLY action_statement (and takeaway) are read from content.
+//   authors, key_messages, subtitle inside content are silently ignored.
 ```
 
 ---
@@ -528,7 +543,9 @@ dispatches to two/three/four_column based on `columns` array length.
   }
 }
 // chart.type: "bar" | "line" | "column" | "area" | "slope" | "dot" | "marimekko"
-// callouts are optional; x_in/y_in are slide inches from top-left
+// callouts are optional; x_in/y_in are chart-relative inches from the chart area top-left
+// Minimal callout (auto-position): {"text": "annotation text"}
+// ⚠ CRITICAL: callout items MUST be dicts — plain strings crash the pipeline (AttributeError)
 // Default chart type if omitted: "column"
 ```
 
@@ -668,6 +685,8 @@ Use `waterfall_slide` (not `chart_slide`) for revenue bridges, cost waterfalls, 
   }
 }
 // likelihood and impact: 1–5 (integers)
+// ⚠ CRITICAL: key is "likelihood" — NOT "probability"; wrong key silently defaults to 3
+// ⚠ CRITICAL: values must be integers — string values ("high", "medium", "low") silently default to 3
 ```
 
 #### `kpi_dashboard`
@@ -741,6 +760,8 @@ Use `waterfall_slide` (not `chart_slide`) for revenue bridges, cost waterfalls, 
   }
 }
 // note ≤80 chars
+// ⚠ The only top-level content key is "rows" — "options", "criteria", "scores" are silently ignored.
+//   For an N-options × M-criteria comparison, use comparison_table instead.
 ```
 
 **Harvey Ball variant** — set `rating_type: "harvey"` for consulting-style pie indicators.
@@ -796,6 +817,7 @@ Score is a fraction from 0.0 (empty) to 1.0 (fully filled). Scale and scale_labe
 }
 // start_q: 0-based index into quarters[]; duration_q: number of quarters
 // tone: "positive" | "negative" | "neutral" — colors the bar
+// ⚠ start_q and duration_q are REQUIRED for a bar to appear — rows with only "label" render as empty lanes
 ```
 
 #### `milestone_timeline`
@@ -883,6 +905,7 @@ Score is a fraction from 0.0 (empty) to 1.0 (fully filled). Scale and scale_labe
 // "actors" is also accepted as an alias for "rows" — both work equally
 // Rich format also accepted: rows[i].steps = [{stage, action, emotion}] — action used as cell text
 // If steps format is used, phases are auto-derived from the first row's stage values
+// ⚠ A top-level "stages" key is NOT supported — it is silently ignored; use "phases" + "rows"
 ```
 
 #### `fishbone`
@@ -1030,7 +1053,7 @@ Score is a fraction from 0.0 (empty) to 1.0 (fully filled). Scale and scale_labe
 {
   "layout": "pillar_detail",
   "content": {
-    "pillar_number": "02",
+    "pillar_number": "02",      // large hero number on left purple panel
     "pillar_label":  "INNOVATION",
     "owner":         {"label": "Pillar Lead", "name": "Dr. Felix Wagner"},
     "sections": [
@@ -1040,6 +1063,8 @@ Score is a fraction from 0.0 (empty) to 1.0 (fully filled). Scale and scale_labe
     ]
   }
 }
+// ONE pillar per slide — use a separate slide for each pillar.
+// ⚠ Key is "sections" [{label, body}] — NOT "pillars"; wrong key silently renders empty right column.
 ```
 
 #### `icon_grid`
@@ -1197,6 +1222,118 @@ Score is a fraction from 0.0 (empty) to 1.0 (fully filled). Scale and scale_labe
 // stages: 2–4 items; body ≤130 chars
 // milestones: 2–6 short label strings (≤20 chars each); omit for clean timeline
 // Use for transformation roadmaps, implementation plans, go-to-market journeys.
+```
+
+---
+
+### Science layouts (`deck_style: "merck_science"` only)
+
+These four layouts are designed for pharma early-research lab progress reports.
+They use Merck Blue as the primary accent, pale blue panel fills, and data-dense rendering.
+
+#### `figure_panel`
+```jsonc
+{
+  "layout": "figure_panel",
+  "style": "merck_science",
+  "content": {
+    "columns": 2,          // 2 (default) or 3
+    "panels": [
+      {"label": "A", "caption": "Cpd-12 vs CDK4 — IC50 8.3 nM (n=3, ±SD)", "image_path": "fig_a.png"},
+      {"label": "B", "caption": "Cpd-17 vs CDK4 — IC50 6.1 nM (n=3, ±SD)"},
+      {"label": "C", "caption": "CDK2 selectivity ratio — 49× and 62× for Cpd-12/17"},
+      {"label": "D", "caption": "MDA-MB-231 cell viability at 72 h"}
+    ]
+  }
+}
+// Renders: N panels in a 2- or 3-column grid (up to 6 panels).
+// Each panel: image (or pale-blue placeholder if no image_path) + bold letter label + caption.
+// image_path: optional path to an exported PNG/JPG from Prism, FlowJo, or imaging software.
+// Use whenever the source has multi-panel figures (dose-response, microscopy, gels).
+```
+
+#### `methods_box`
+```jsonc
+{
+  "layout": "methods_box",
+  "style": "merck_science",
+  "content": {
+    "conditions": [
+      {"key": "Assay format",  "value": "384-well fluorescence polarization"},
+      {"key": "Enzyme",        "value": "CDK4/CycD1 recombinant (BPS Bioscience)"},
+      {"key": "ATP",           "value": "10 μM (Km)"},
+      {"key": "Incubation",    "value": "60 min at 30 °C"},
+      {"key": "Detection",     "value": "PHERAstar FSX, Ex 485/Em 520"},
+      {"key": "Replicates",    "value": "n=3 independent experiments"},
+      {"key": "Statistics",    "value": "Geometric mean ± 95% CI"}
+    ],
+    "result": {
+      "label": "POTENCY (CDK4)",
+      "value": "IC50 = 8.3 nM",
+      "note":  "Geom. mean ± 95% CI; n=3"
+    }
+  }
+}
+// Renders: two-panel layout — conditions table (left 2/3) + key result card (right 1/3).
+// Conditions: blue header row + alternating pale-blue/white data rows.
+// Result card: large bold value with label and note in a rounded pale-blue card.
+// Up to 12 condition rows; result.value ≤20 chars for best fit.
+```
+
+#### `sar_table`
+```jsonc
+{
+  "layout": "sar_table",
+  "style": "merck_science",
+  "content": {
+    // Rich format (two-tier headers):
+    "header_groups": [
+      {"label": "Identity",           "columns": ["ID", "MW"]},
+      {"label": "Potency (IC50, nM)", "columns": ["CDK4", "CDK6", "CDK2", "Ratio"]},
+      {"label": "ADMET",              "columns": ["Clint", "Papp", "Sol"]}
+    ],
+    "rows": [
+      {"label": "Cpd-1",  "values": ["358", "42",  "38",  "890",  "21×", ">50", "12.3", ">50"], "highlighted": false},
+      {"label": "Cpd-12", "values": ["374", "8.3", "11",  "410",  "49×", "22",  "18.1", "42"],  "highlighted": true},
+      {"label": "Cpd-17", "values": ["391", "6.1", "9.4", "380",  "62×", "18",  "21.4", "38"],  "highlighted": true}
+    ]
+  }
+}
+// Also supports simple format with flat "columns": [str] + "rows": [{label, values, highlighted}].
+// Renders: blue group header row (optional) → pale-blue column header row → data rows.
+// Alternating white/pale-blue row shading. highlighted rows: blue left-edge bar + bold label.
+// Use for SAR tables, selectivity panels, ADMET summaries, compound comparison matrices.
+```
+
+#### `multi_chart`
+```jsonc
+{
+  "layout": "multi_chart",
+  "style": "merck_science",
+  "content": {
+    "layout": "1x2",       // "1x2" (2 charts side by side) or "2x2" (4-chart grid)
+    "charts": [
+      {
+        "title": "Cpd-12 — % CDK4 inhibition",
+        "chart": {"type": "bar", "data": {
+          "categories": ["0.1 nM", "1 nM", "10 nM", "100 nM"],
+          "series": [{"name": "% Inhibition", "values": [4, 22, 71, 95]}]
+        }}
+      },
+      {
+        "title": "Cpd-17 — % CDK4 inhibition",
+        "chart": {"type": "bar", "data": {
+          "categories": ["0.1 nM", "1 nM", "10 nM", "100 nM"],
+          "series": [{"name": "% Inhibition", "values": [3, 18, 66, 94]}]
+        }}
+      }
+    ]
+  }
+}
+// Renders: 2 (1×2) or 4 (2×2) charts on one slide with per-chart titles.
+// Each chart entry uses the same "chart" schema as chart_slide.
+// Shows placeholder rect when chart data cannot be rendered.
+// Use for compound comparison dose-response, series potency distributions, etc.
 ```
 
 ---
@@ -1378,7 +1515,8 @@ Use this table to choose the right layout for your content. When in doubt, prefe
 | 3 options | `three_column` | Exactly 3 columns array items |
 | 4 options or time periods (Q1–Q4) | `four_column` | Exactly 4 columns array items |
 | N options × N criteria evaluation matrix | `comparison_table` | Highlighted rows for key criteria |
-| Alternatives with numeric scoring | `score_table` | Use category field to group rows |
+| Alternatives with numeric scoring (one score per row) | `score_table` | Use category field to group rows; each row = one criterion, one numeric score |
+| N options × M criteria matrix with text cells | `comparison_table` | Use when you have multiple options as columns and criteria as rows |
 | Explicit pros and cons for a named topic | `pros_cons` | Customize pros_label / cons_label |
 | Factors influencing a central outcome | `influence_diagram` | Assign forces to left/right/top/bottom |
 
@@ -1464,6 +1602,15 @@ These mistakes produce silently empty or broken slides — no error is raised:
 | `score_table` Harvey Ball | `score: 4` (integer out of scale) | `score: 0.75` (float 0.0–1.0) when `rating_type: "harvey"` |
 | `road_to_success` | `"stages"` containing phases without `title`/`body` | `stages: [{title, body}]` |
 | callout (decision_rows etc.) | `callout.type: "done"` or `"check"` | `type` must be `"conclusion"` / `"result"` / `"next"` / `"future"` |
+| `chart_slide` | `callouts: ["plain string"]` | `callouts: [{"text": "plain string"}]` — plain strings crash the pipeline |
+| `risk_heatmap` | `"probability"` key or `"high"`/`"medium"`/`"low"` string values | `"likelihood"` with integer 1–5; wrong key or non-numeric value silently defaults to 3 |
+| `close` | `authors`, `key_messages`, `subtitle` inside `content` | only `action_statement` (and `takeaway`) are read from `content`; everything else ignored |
+| `pillar_detail` | `pillars: [{title, description, metric}]` | `sections: [{label, body}]` plus `pillar_number`, `pillar_label`, `owner` — wrong key renders empty |
+| `score_table` | `options`/`criteria`/`scores` format | `rows: [{label, score, category, note}]` with integer `scale` — wrong format renders empty |
+| `gantt` | `rows: [{label}]` without `start_q`/`duration_q` | always include `start_q` (0-based int) and `duration_q` (int) — rows without them render as empty lanes |
+| `journey_map` | top-level `"stages"` key | top-level key must be `"phases"` (list of strings) with `"rows"` or `"actors"`; `"stages"` is silently ignored |
+| `cover` | `authors: ["Name"]` strings | works (name rendered, title omitted); prefer `[{"name": "...", "title": "..."}]` for full byline |
+| `section_divider` | `content.title` for chapter heading | chapter heading goes in slide-level `action_title`; only `content.number` is read from content |
 
 ---
 
@@ -1495,7 +1642,34 @@ These mistakes produce silently empty or broken slides — no error is raised:
 
 ---
 
-## 17. Complete minimal example plan
+## 17. Python API
+
+For scripts and integrations that call the pipeline directly from Python:
+
+```python
+from merck_pptx import generate_deck, build_from_plan
+
+# Markdown or .pptx → Merck deck (calls Claude via Foundry AIP)
+generate_deck("brief.md", "output/deck.pptx", meta={
+    "region":         "EU",
+    "deck_label":     "Q2 Oncology Review",
+    "classification": "Confidential",
+    "month_year":     "June 2026",
+    "audience":       "Executive leadership",
+    "deck_style":     "merck_executive",
+    "color_theme":    "organic",
+})
+
+# Plan dict or .json → Merck deck (no Claude, fully deterministic)
+build_from_plan(plan_dict, "output/deck.pptx")
+build_from_plan("plan.json", "output/deck.pptx")
+```
+
+`meta` accepts the same fields as the CLI `--meta` JSON file. All required fields must be provided. Optional fields (`division`, `color_theme`, `variety_mode`, `show_disclaimer`, `chrome`) default as described in §2.
+
+---
+
+## 18. Complete minimal example plan
 
 ```json
 {

@@ -6,7 +6,7 @@ from pptx.util import Emu, Inches, Pt
 # Fonts and palette
 # ===========================================================================
 
-FONT_HEAD = "Merck Web"
+FONT_HEAD = "Verdana"  # BinaryFiles carry KR_Merck theme (major=Noto Sans CJK KR Bold); always override with Verdana
 FONT_BODY = "Verdana"
 
 SLIDE_W = Inches(13.333)
@@ -252,6 +252,24 @@ PALETTES = {
         "warn":      _MC_YELLOW,
         "bad":       BAD_RED,
         "lime":      _MC_LIGHTGREEN,
+    },
+    "merck_science": {    # white bg, blue accent — data-first scientific reporting
+        "bg":        WHITE,
+        "ink":       INK_DARK,
+        "ink_2":     INK_GRAY,
+        "ink_3":     LIGHT_GRAY,
+        "accent":    MERCK_BLUE,         # #0F69AF — blue as primary accent
+        "accent_2":  MERCK_PURPLE,       # purple demoted to secondary
+        "accent_3":  GOOD_GREEN,
+        "highlight": MERCK_AQUA,         # #96D7D2 — soft teal for subtle highlights
+        "hot":       MERCK_BLUE,         # blue as "hot" (no dramatic theatrics)
+        "rule":      LIGHT_GRAY,
+        "panel":     (0xEA, 0xF2, 0xFB), # pale blue panel (vs purple-tinted PANEL_LIGHT)
+        "muted":     (0x5A, 0x82, 0xA8), # blue-gray for captions and methodology notes
+        "good":      GOOD_GREEN,
+        "warn":      MERCK_YELLOW,
+        "bad":       BAD_RED,
+        "lime":      OP_LIME,
     },
 }
 

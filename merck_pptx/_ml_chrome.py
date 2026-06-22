@@ -273,9 +273,14 @@ def _section_marker(slide, number, category, palette, icon=None):
     always renders independently of the circle.
     """
     dark = _is_dark(palette)
-    circle_fill = MERCK_PURPLE if not dark else MERCK_YELLOW
-    number_color = WHITE if not dark else INK_DARK
-    tag_color = PURPLE_MUTED if not dark else MERCK_GOLD
+    if palette == "merck_science":
+        circle_fill  = MERCK_BLUE
+        number_color = WHITE
+        tag_color    = (0x5A, 0x82, 0xA8)  # blue-gray muted
+    else:
+        circle_fill  = MERCK_PURPLE if not dark else MERCK_YELLOW
+        number_color = WHITE if not dark else INK_DARK
+        tag_color    = PURPLE_MUTED if not dark else MERCK_GOLD
 
     has_number = number is not None and str(number) != ""
     if has_number or icon:
@@ -300,7 +305,10 @@ def _render_action_title(slide, x, y, w, h, content, palette,
     pal = _palette_for(palette)
     dark = _is_dark(palette)
     if base_color is None:
-        base_color = WHITE if dark else MERCK_PURPLE
+        if palette == "merck_science":
+            base_color = INK_DARK      # dark ink replaces purple for scientific neutrality
+        else:
+            base_color = WHITE if dark else MERCK_PURPLE
     if italic_color is None:
         italic_color = pal["hot"]
 

@@ -41,7 +41,7 @@ This schema is the source of truth. The agent does not generate slides outside t
 | classification | yes | Public / Internal / Confidential |
 | month_year | yes | "Month YYYY" format |
 | audience | yes | Executive leadership / Senior management / Functional team / Mixed audience / External |
-| deck_style | yes | merck_executive / merck_corporate / merck_storytelling |
+| deck_style | yes | merck_executive / merck_corporate / merck_storytelling / merck_science |
 | show_disclaimer | yes | Boolean; only true for external-facing |
 | topic | yes | Short noun phrase for the deck topic |
 | deck_objective | yes | One sentence; what the deck is for |
@@ -117,7 +117,7 @@ Each slide is one object. The order is the deck order.
 | section_number | yes (content slides) | UNIQUE sequential number (1, 2, 3, ..., N). Never the page number. Never shared across slides. |
 | page_function | yes | Cover / Framing / Diagnosis / Evidence / Options / Recommendation / Roadmap / Decision Request / Risk / Tradeoff / Close / Section Divider / Hero Moment / Executive Summary |
 | layout | yes | One of the layout names in the catalog below |
-| style | yes | `inherit` OR one of merck_executive / merck_corporate / merck_storytelling |
+| style | yes | `inherit` OR one of merck_executive / merck_corporate / merck_storytelling / merck_science |
 | action_title | yes | Full declarative sentence (string OR list of `(text, italic_bool)` tuples) |
 | category | optional but recommended | Short UPPERCASE tag (e.g. DIAGNOSIS, EVIDENCE, RISK). Also drives auto-promote. |
 | subtitle | optional | One-line qualifier under the action title |
@@ -1008,6 +1008,129 @@ Use sparingly — no more than 1 in 4 slides.
     "footnotes": [
       [1, "PS includes Reagents and Consumables; excludes Pharma."],
       [2, "DS reported through legacy ERP; reconciliation in progress."]
+    ]
+  }
+}
+```
+
+---
+
+---
+
+## SCIENCE LAYOUTS (deck_style: "merck_science")
+
+Use these layouts when `deck_style` is `"merck_science"`. They are designed for
+pharma early-research lab progress reports: data-first, minimal chrome, blue accent.
+
+### figure_panel
+
+Multi-panel figure grid. Each panel is an image placeholder (or embedded image)
+with a bold letter label and a short caption. Ideal for multi-panel microscopy,
+dose-response curves, or gel images.
+
+```json
+{
+  "layout": "figure_panel",
+  "style": "merck_science",
+  "content": {
+    "columns": 2,
+    "panels": [
+      {"label": "A", "caption": "IC50 compound 12 vs CDK4 (n=3, ±SD)", "image_path": "fig_a.png"},
+      {"label": "B", "caption": "IC50 compound 17 vs CDK4 (n=3, ±SD)", "image_path": "fig_b.png"},
+      {"label": "C", "caption": "CDK2 selectivity ratio by compound"},
+      {"label": "D", "caption": "MDA-MB-231 cell viability 72 h"}
+    ]
+  }
+}
+```
+
+### methods_box
+
+Experimental conditions table (left two-thirds) + key result card (right one-third).
+Use for any slide that presents protocol alongside a headline result.
+
+```json
+{
+  "layout": "methods_box",
+  "style": "merck_science",
+  "content": {
+    "conditions": [
+      {"key": "Assay format",  "value": "384-well, fluorescence polarization"},
+      {"key": "Cell line",     "value": "MDA-MB-231 (CDK4-amplified)"},
+      {"key": "Incubation",    "value": "2 h, 37 °C, 5% CO₂"},
+      {"key": "Detection",     "value": "PHERAstar FSX, Ex 485 / Em 520"},
+      {"key": "Replicates",    "value": "n=3 independent experiments"},
+      {"key": "Statistics",    "value": "One-way ANOVA, Dunnett post-hoc"}
+    ],
+    "result": {
+      "label": "POTENCY (CDK4)",
+      "value": "IC50 = 8.3 nM",
+      "note":  "Geometric mean ± 95% CI; n=3"
+    }
+  }
+}
+```
+
+### sar_table
+
+Wide structure-activity relationship or ADMET data table. Supports optional
+two-tier group headers. Highlighted rows receive a blue left-edge accent bar.
+
+Rich format (two-tier headers):
+```json
+{
+  "layout": "sar_table",
+  "style": "merck_science",
+  "content": {
+    "header_groups": [
+      {"label": "Identity",              "columns": ["ID", "MW"]},
+      {"label": "Potency (IC50, nM)",    "columns": ["CDK4", "CDK6", "Ratio"]},
+      {"label": "ADMET",                 "columns": ["Clint (μL/min/mg)", "Papp A→B (×10⁻⁶)", "Sol (μM)"]}
+    ],
+    "rows": [
+      {"label": "Cpd-1",  "values": ["358", "42",  "38",  "1.1", ">50", "12.3", ">50"], "highlighted": false},
+      {"label": "Cpd-12", "values": ["374", "8.3", "11",  "1.3", "22",  "18.1", "42"],  "highlighted": true},
+      {"label": "Cpd-17", "values": ["391", "6.1", "9.4", "1.5", "18",  "21.4", "38"],  "highlighted": true}
+    ]
+  }
+}
+```
+
+Simple format (flat column list):
+```json
+{
+  "layout": "sar_table",
+  "style": "merck_science",
+  "content": {
+    "columns": ["MW", "CDK4 IC50 (nM)", "CDK2 IC50 (nM)", "Selectivity", "Clint"],
+    "rows": [
+      {"label": "Cpd-1",  "values": ["358", "42",  "890",  "21×", ">50"]},
+      {"label": "Cpd-12", "values": ["374", "8.3", "410",  "49×", "22"],  "highlighted": true}
+    ]
+  }
+}
+```
+
+### multi_chart
+
+Two or four small charts on one slide for side-by-side comparison.
+Each chart entry uses the same `chart` schema as `chart_slide`.
+
+```json
+{
+  "layout": "multi_chart",
+  "style": "merck_science",
+  "content": {
+    "layout": "1x2",
+    "charts": [
+      {
+        "title": "Compound 12 — dose-response CDK4",
+        "chart": {"type": "bar", "data": {"categories": ["0.1", "1", "10", "100"], "series": [{"name": "% Inhibition", "values": [5, 28, 74, 96]}]}}
+      },
+      {
+        "title": "Compound 17 — dose-response CDK4",
+        "chart": {"type": "bar", "data": {"categories": ["0.1", "1", "10", "100"], "series": [{"name": "% Inhibition", "values": [3, 21, 68, 94]}]}}
+      }
     ]
   }
 }

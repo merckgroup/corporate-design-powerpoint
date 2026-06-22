@@ -104,18 +104,21 @@ def _draw_cover_keymessages_grid(slide, cards, grid_top, grid_h, card_style):
             m.get("body", ""), sz=11, color=INK_GRAY, font=FONT_BODY)
 
 
-def _draw_cover_authors(slide, authors, dark=False):
+def _draw_cover_authors(slide, authors, dark=False, start_y=None):
     """Stack a list of {name, title} byline entries below the subtitle area.
 
     Authors render one per line from y ~5.20 to y ~6.10. Name in bold (white
     on dark covers, INK_DARK on light), title in lighter color on the same
     line, separated by a small gap.
+    start_y: override default y position (Inches). Science covers pass 4.20
+    to render authors more prominently in the lower half.
     """
     if not authors:
         return
     rows = list(authors)[:5]
     line_h = Inches(0.32)
-    start_y = Inches(5.20)
+    if start_y is None:
+        start_y = Inches(5.20)
     if dark:
         name_color = WHITE
         title_color = PANEL_LIGHT
@@ -245,11 +248,14 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
         # placeholder color is nearly invisible without an explicit override.
         _binary = bool((meta or {}).get("_binary_template"))
         _cover_dark  = theme_lower in ("synthetic", "electronics")
+        # Always override title/body font — BinaryFiles use KR_Merck theme whose major
+        # Latin font is Noto Sans CJK KR Bold; without an explicit override the title
+        # inherits that font instead of the intended brand typeface.
         _title_color = None if _binary else (WHITE if _cover_dark else MERCK_PURPLE)
         _body_color  = None if _binary else (PANEL_LIGHT if _cover_dark else INK_GRAY)
-        _body_font   = None if _binary else FONT_BODY
+        _body_font   = FONT_BODY
 
-        ph_title = _populate_placeholder(0, slide, title_part, color=_title_color)
+        ph_title = _populate_placeholder(0, slide, title_part, font=FONT_HEAD, color=_title_color)
         if ph_title is not None and ph_title.has_text_frame:
             try:
                 from pptx.enum.text import MSO_AUTO_SIZE
@@ -322,50 +328,73 @@ def build_cover(prs, meta, title=None, subtitle="", style="merck_executive",
         _bottom_chrome(slide, meta, None, None, None, style)
 
     else:
-        # Light cover: white bg.
+        # Light cover: white bg (corporate, executive, and science).
         _top_chrome(slide, meta, category, style,
                     top_bar=top_bar or bool((meta or {}).get("cover_top_bar")))
-        # Hero title in purple bold (with optional italic emphasis in yellow).
-        _render_action_title(slide, Inches(0.65), Inches(1.80),
-                             Inches(12.0), Inches(1.70), title, style,
-                             size=44, italic_color=MERCK_YELLOW,
-                             base_color=MERCK_PURPLE)
-        # Theme-accent rule under title.
-        hairline(slide, Inches(0.65), Inches(3.55), Inches(2.6),
-                 Emu(int(Pt(2.5))), pal["highlight"])
-        # Subtitle gray italic.
-        if subtitle:
-            txt(slide, Inches(0.65), Inches(3.75), Inches(12.0), Inches(0.50),
-                subtitle, sz=16, color=INK_GRAY, italic=True, font=FONT_BODY)
 
-        # N-aware key_messages grid (1/2/3/4 cards).
-        if key_messages:
-            _draw_cover_keymessages_grid(slide, key_messages,
-                                         Inches(4.20), Inches(1.80), style)
+        if style == "merck_science":
+            # Science cover: dark-ink title, blue accent, prominent authors,
+            # no key_messages grid (data speaks — cover does not pre-summarise).
+            _render_action_title(slide, Inches(0.65), Inches(1.80),
+                                 Inches(12.0), Inches(1.70), title, style,
+                                 size=44, italic_color=MERCK_BLUE,
+                                 base_color=INK_DARK)
+            # Thin blue hairline under the title — quieter than corporate pink.
+            hairline(slide, Inches(0.65), Inches(3.55), Inches(2.6),
+                     Emu(int(Pt(1.5))), pal["accent"])
+            if subtitle:
+                txt(slide, Inches(0.65), Inches(3.75), Inches(12.0), Inches(0.50),
+                    subtitle, sz=16, color=INK_GRAY, italic=True, font=FONT_BODY)
+            # Authors are the hero on a lab report cover — start higher (y=4.20).
+            if authors:
+                _draw_cover_authors(slide, authors, dark=False, start_y=Inches(4.20))
+            # Lab / project / date strip in blue-gray.
+            deck_label = (meta or {}).get("deck_label", "")
+            month_year = (meta or {}).get("month_year", "")
+            if deck_label or month_year:
+                parts = []
+                if deck_label:
+                    parts.append(_tracked(deck_label))
+                if month_year:
+                    parts.append(_tracked(month_year))
+                txt(slide, Inches(0.65), Inches(5.95), Inches(12.0), Inches(0.30),
+                    "   •   ".join(parts), sz=10, color=pal["muted"], bold=True,
+                    font=FONT_BODY)
+        else:
+            # Hero title in purple bold (with optional italic emphasis in yellow).
+            _render_action_title(slide, Inches(0.65), Inches(1.80),
+                                 Inches(12.0), Inches(1.70), title, style,
+                                 size=44, italic_color=MERCK_YELLOW,
+                                 base_color=MERCK_PURPLE)
+            # Theme-accent rule under title.
+            hairline(slide, Inches(0.65), Inches(3.55), Inches(2.6),
+                     Emu(int(Pt(2.5))), pal["highlight"])
+            if subtitle:
+                txt(slide, Inches(0.65), Inches(3.75), Inches(12.0), Inches(0.50),
+                    subtitle, sz=16, color=INK_GRAY, italic=True, font=FONT_BODY)
+            # N-aware key_messages grid (1/2/3/4 cards).
+            if key_messages:
+                _draw_cover_keymessages_grid(slide, key_messages,
+                                             Inches(4.20), Inches(1.80), style)
+            # Authors byline.
+            if authors:
+                _draw_cover_authors(slide, authors, dark=False)
+            # Deck label and month/year strip near bottom.
+            deck_label = (meta or {}).get("deck_label", "")
+            month_year = (meta or {}).get("month_year", "")
+            if deck_label or month_year:
+                parts = []
+                if deck_label:
+                    parts.append(_tracked(deck_label))
+                if month_year:
+                    parts.append(_tracked(month_year))
+                txt(slide, Inches(0.65), Inches(5.95), Inches(12.0), Inches(0.30),
+                    "   •   ".join(parts), sz=10, color=PURPLE_MUTED, bold=True,
+                    font=FONT_BODY)
 
-        # Authors byline (stacked, name bold + title in lighter color).
-        if authors:
-            _draw_cover_authors(slide, authors, dark=False)
-
-        # Deck label and month/year strip near bottom.
-        deck_label = (meta or {}).get("deck_label", "")
-        month_year = (meta or {}).get("month_year", "")
-        if deck_label or month_year:
-            parts = []
-            if deck_label:
-                parts.append(_tracked(deck_label))
-            if month_year:
-                parts.append(_tracked(month_year))
-            sep = "   •   "
-            txt(slide, Inches(0.65), Inches(5.95), Inches(12.0), Inches(0.30),
-                sep.join(parts), sz=10, color=PURPLE_MUTED, bold=True,
-                font=FONT_BODY)
-
-        # Phase strip.
+        # Phase strip and footer — shared by all light-cover variants.
         if phases:
             _phase_progress(slide, phases, style)
-
-        # Footer band.
         _bottom_chrome(slide, meta, None, None, None, style)
 
     return slide
@@ -453,7 +482,7 @@ def build_agenda(prs, meta, chapters=None, style="merck_executive",
     _bottom_chrome(slide, meta, "Index", page, total, style)
 
     # Action title — same size / font as on all content slides so the
-    # agenda title doesn't dominate the page at 44pt Merck Web all-caps.
+    # agenda title doesn't dominate the page at 44pt Merck (FONT_HEAD) all-caps.
     dark = _is_dark(style)
     title_color = WHITE if dark else MERCK_PURPLE
     title_text = action_title if action_title else "INDEX"
@@ -464,90 +493,111 @@ def build_agenda(prs, meta, chapters=None, style="merck_executive",
     items = (chapters or [])[:12]
     if not items:
         return slide
-    # Two-column layout (left half + right half).
-    half = len(items) // 2 + len(items) % 2
-    col_top = _content_y(meta)  # tightly below action title, circles-aware
-    col_h = Inches(3.95)
-    col_w = (Inches(12.0) - Inches(0.50)) / 2
-    row_gap = Inches(0.12)
-    rows_left = items[:half]
-    rows_right = items[half:]
 
-    def _draw_col(rows, x0):
-        if not rows:
-            return
-        n = len(rows)
-        compact = (n >= 5)
-        title_sz = 12 if compact else 14
-        sub_sz = 9 if compact else 10
-        row_h = (col_h - row_gap * (n - 1)) / n
-        for i, ch in enumerate(rows):
+    n          = len(items)
+    compact    = (n >= 6)
+    num_sz     = 16 if compact else 22  # matches exec_summary large-number visual weight
+    title_sz   = 12 if compact else 15
+    sub_sz     = 9  if compact else 10
+    num_color  = pal["accent"] if not dark else pal["hot"]
+    sep_color  = LIGHT_GRAY if not dark else (0x60, 0x50, 0x80)
+
+    # Content area: from just below the action title to just above the footer.
+    col_top    = _content_y(meta)
+    col_bottom = Inches(6.50)
+    avail_h    = col_bottom - col_top
+    row_gap    = Inches(0.10)
+
+    # Single-column for ≤ 4 chapters (avoids the Z-pattern from unequal splits).
+    SINGLE_COL_MAX = 4
+    if n <= SINGLE_COL_MAX:
+        col_w  = Inches(12.0)
+        x_cols = [(Inches(0.65), items)]
+        row_h  = (avail_h - row_gap * max(n - 1, 0)) / max(n, 1)
+    else:
+        n_left  = (n + 1) // 2
+        col_w   = (Inches(12.0) - Inches(0.50)) / 2
+        # SAME row_h for both columns so rows align horizontally.
+        row_h   = (avail_h - row_gap * max(n_left - 1, 0)) / max(n_left, 1)
+        x_cols  = [
+            (Inches(0.65),                        items[:n_left]),
+            (Inches(0.65) + col_w + Inches(0.50), items[n_left:]),
+        ]
+
+    def _draw_row(i, ch, x0, ry, is_last):
+        number   = _pad_int(ch.get("number") or (i + 1))  # zero-padded: "01", "02"
+        title    = ch.get("title", "")
+        sub      = ch.get("subtitle", "")
+        duration = ch.get("duration", "")
+        speaker  = ch.get("speaker", "")
+
+        # Number — larger, accent-colored, visually distinct from title.
+        num_w     = Inches(0.65)
+        num_shape = txt(slide, x0, ry + Inches(0.05), num_w, Inches(0.50),
+                        str(number), sz=num_sz, color=num_color, bold=True,
+                        font=FONT_BODY)
+        try:
+            num_shape.name = f"AgendaChapter_{number}"
+        except Exception:
+            pass
+
+        # Reserve right margin for optional duration / speaker columns.
+        right_reserved = Inches(0.0)
+        if show_speaker  and speaker:  right_reserved += Inches(1.55)
+        if show_duration and duration: right_reserved += Inches(1.35)
+        title_avail_w = col_w - num_w - right_reserved
+
+        # Title text — generous height so long titles wrap without clipping.
+        has_sub = bool(sub)
+        title_h = (row_h * 0.60) if has_sub else min(row_h * 0.85, Inches(0.80))
+        title_shape = txt(slide, x0 + num_w, ry,
+                          max(title_avail_w, Inches(1.0)), title_h,
+                          title, sz=title_sz,
+                          color=INK_DARK if not dark else WHITE,
+                          bold=True, font=FONT_BODY)
+        try:
+            title_shape.name = f"AgendaChapter_{number}"
+        except Exception:
+            pass
+
+        if has_sub:
+            sub_y = ry + title_h + Inches(0.03)
+            sub_h = max(row_h - title_h - Inches(0.08), Inches(0.18))
+            txt(slide, x0 + num_w, sub_y,
+                max(title_avail_w, Inches(1.0)), sub_h,
+                sub, sz=sub_sz,
+                color=INK_GRAY if not dark else PANEL_LIGHT,
+                italic=True, font=FONT_BODY)
+
+        # Duration / speaker (optional right-side columns).
+        right_cursor = x0 + col_w
+        if show_speaker and speaker:
+            spk_w = Inches(1.45)
+            right_cursor -= spk_w
+            txt(slide, right_cursor, ry, spk_w, Inches(0.36),
+                str(speaker), sz=sub_sz,
+                color=pal["accent"] if not dark else pal["hot"],
+                font=FONT_BODY, italic=True, anchor=MSO_ANCHOR.MIDDLE)
+            right_cursor -= Inches(0.15)
+        if show_duration and duration:
+            dur_w = Inches(1.20)
+            right_cursor -= dur_w
+            txt(slide, right_cursor, ry, dur_w, Inches(0.36),
+                str(duration), sz=sub_sz,
+                color=INK_GRAY if not dark else PANEL_LIGHT,
+                font=FONT_BODY, align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE)
+
+        # Hairline separator below each row except the last in this column.
+        if not is_last:
+            sep_y = ry + row_h + row_gap / 2
+            hairline(slide, x0, sep_y, col_w, Emu(int(Pt(0.75))), sep_color)
+
+    for x0, col_items in x_cols:
+        m = len(col_items)
+        for i, ch in enumerate(col_items):
             ry = col_top + i * (row_h + row_gap)
-            number   = ch.get("number") or _pad_int(i + 1)
-            title    = ch.get("title", "")
-            sub      = ch.get("subtitle", "")
-            duration = ch.get("duration", "")
-            speaker  = ch.get("speaker", "")
-            # Number in purple bold. Named with the chapter number so the
-            # canonical runner can attach a slide-jump hyperlink in a
-            # post-pass after all target slides exist.
-            num_color = MERCK_PURPLE if not dark else pal["hot"]
-            num_shape = txt(slide, x0, ry, Inches(0.60), Inches(0.40),
-                str(number), sz=title_sz, color=num_color, bold=True,
-                font=FONT_BODY)
-            try:
-                num_shape.name = f"AgendaChapter_{number}"
-            except Exception:
-                pass
-            # Reserve right-hand space for optional duration / speaker columns
-            # so the title box never overlaps them.
-            right_reserved = Inches(0.0)
-            if show_speaker  and speaker:  right_reserved += Inches(1.55)
-            if show_duration and duration: right_reserved += Inches(1.35)
-            title_avail_w = col_w - Inches(0.55) - right_reserved
+            _draw_row(i, ch, x0, ry, is_last=(i == m - 1))
 
-            # Title in INK_DARK bold (also named for hyperlink targeting).
-            # Height is generous so long titles can wrap to 2 lines without clipping.
-            title_h = min(row_h * 0.75, Inches(0.70))
-            title_shape = txt(slide, x0 + Inches(0.55), ry,
-                max(title_avail_w, Inches(1.0)),
-                title_h,
-                title, sz=title_sz,
-                color=INK_DARK if not dark else WHITE,
-                bold=True, font=FONT_BODY)
-            try:
-                title_shape.name = f"AgendaChapter_{number}"
-            except Exception:
-                pass
-            if sub:
-                sub_y = ry + title_h + Inches(0.02)
-                sub_h = max(row_h - title_h - Inches(0.06), Inches(0.18))
-                txt(slide, x0 + Inches(0.55), sub_y,
-                    max(title_avail_w, Inches(1.0)),
-                    sub_h,
-                    sub, sz=sub_sz,
-                    color=INK_GRAY if not dark else PANEL_LIGHT,
-                    italic=True, font=FONT_BODY)
-            # Duration and speaker columns — placed from the right edge inward
-            # with at least 0.15" clearance between each other.
-            right_cursor = x0 + col_w
-            if show_speaker and speaker:
-                spk_w = Inches(1.45)
-                right_cursor -= spk_w
-                txt(slide, right_cursor, ry, spk_w, Inches(0.36),
-                    str(speaker), sz=sub_sz,
-                    color=pal["accent"] if not dark else pal["hot"],
-                    font=FONT_BODY, italic=True, anchor=MSO_ANCHOR.MIDDLE)
-                right_cursor -= Inches(0.15)
-            if show_duration and duration:
-                dur_w = Inches(1.20)
-                right_cursor -= dur_w
-                txt(slide, right_cursor, ry, dur_w, Inches(0.36),
-                    str(duration), sz=sub_sz,
-                    color=INK_GRAY if not dark else PANEL_LIGHT,
-                    font=FONT_BODY, align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE)
-    _draw_col(rows_left, Inches(0.65))
-    _draw_col(rows_right, Inches(0.65) + col_w + Inches(0.50))
     return slide
 
 
@@ -598,7 +648,9 @@ def build_section_divider(prs, meta, number=None, title=None, style="merck_execu
     # for those themes — this would make the divider entirely yellow.
     # Use the programmatic fallback instead so the palette bg (violet) is
     # applied correctly.
-    divider_layout = _divider_layout(prs) if not _is_dark(style) else None
+    # merck_science bypasses the template divider (organic blobs clash with the
+    # minimal scientific aesthetic) — fall through to the programmatic renderer.
+    divider_layout = _divider_layout(prs) if (not _is_dark(style) and style != "merck_science") else None
     if divider_layout is not None:
         slide = prs.slides.add_slide(divider_layout)
         # idx=13 is the LEFT small number blob (3" wide); idx=0 is the RIGHT wide
@@ -621,7 +673,8 @@ def build_section_divider(prs, meta, number=None, title=None, style="merck_execu
         # using BinaryFile templates so the chapter title is clearly readable.
         _binary = bool((meta or {}).get("_binary_template"))
         _div_color = WHITE if _binary else None
-        ph0 = _populate_placeholder(0, slide, str(title), color=_div_color)
+        # Always override font — BinaryFiles use KR_Merck theme (Noto Sans CJK KR)
+        ph0 = _populate_placeholder(0, slide, str(title), font=FONT_HEAD, color=_div_color)
         if ph0 is not None and ph0.has_text_frame:
             ph0.text_frame.word_wrap = True
             try:
@@ -686,7 +739,7 @@ def build_close(prs, meta, action_statement=None, style="merck_executive",
                 page=None, total=None, section_number=None,
                 category=None, takeaway=None, source=None,
                 action_title=None, methodology_note=None, content=None):
-    """Close slide. Action statement in big italic Merck Web, gold rule.
+    """Close slide. Action statement in big italic Merck (FONT_HEAD), gold rule.
     page and total are accepted for caller consistency; close slides typically
     omit the page number visually but the kwargs prevent a TypeError on callers
     that pass page=N, total=N as part of their consistent slide-call pattern.

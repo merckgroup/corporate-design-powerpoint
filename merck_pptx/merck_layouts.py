@@ -1,7 +1,7 @@
 """Merck Layouts: rendering engine for Merck-branded PowerPoint decks.
 
-Produces consistent 16:9 slides across three locked styles:
-  merck_executive | merck_corporate | merck_storytelling
+Produces consistent 16:9 slides across four locked styles:
+  merck_executive | merck_corporate | merck_storytelling | merck_science
 
 This module is a public re-export facade. All implementation lives in
 the private _ml_* submodules. Import from this module as before — the
@@ -137,4 +137,9 @@ from ._ml_layouts_visual import (
     build_pull_quote, build_word_cloud, build_pyramid, build_venn,
     build_layered_stack, build_photo_text, build_fishbone,
     build_key_question,
+)
+
+# --- Layout functions — science slides (merck_science style) ---
+from ._ml_layouts_science import (
+    build_figure_panel, build_methods_box, build_sar_table, build_multi_chart,
 )

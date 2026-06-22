@@ -7,7 +7,7 @@
 > | Need | Go to |
 > |---|---|
 > | Which layout to use, content schemas, pre-send checklist | **You are here** |
-> | CLI commands, Python API, full layout catalog with every key | `README.md` |
+> | How to use the tool, the six settings, layout overview | `README.md` |
 > | Exact color rules, typography, accessibility, brand governance | `Merck_Presentation_Guidelines.md` |
 > | Complete JSON schema for all 46 layouts (for LLM use) | `LLM_PLAN_GUIDE.md` |
 
@@ -45,13 +45,16 @@ Set `meta.region` to match your audience — this controls the legal disclaimer 
 
 Set `meta.deck_style`. Every slide in the deck inherits this unless overridden per-slide.
 
-| Style | When to use | Background | Primary color |
+| Style | When to use | Background | Primary accent |
 |---|---|---|---|
 | `merck_executive` | Board decks, C-suite, formal decisions | White | Rich Purple |
 | `merck_corporate` | General business presentations | White | Rich Purple |
 | `merck_storytelling` | Impactful narrative, bold statements | Purple | White (inverted) |
+| `merck_science` | Pharma lab reports, early-research data decks | White | Merck Blue |
 
-**Auto-promotion:** Any slide with category "Executive Summary", "Recommendation", "Decision Request", "Risk", or "Tradeoff" automatically gets `merck_executive` style — even if the deck default is different.
+**Auto-promotion:** Any slide with category "Executive Summary", "Recommendation", "Decision Request", "Risk", or "Tradeoff" automatically gets `merck_executive` style — except in `merck_science` decks, where auto-promote is suppressed to preserve the data-first visual language.
+
+**`merck_science` specifics:** Title text uses dark ink instead of purple. Section circles are Merck Blue. The cover shows prominent author bylines (no key_messages grid). Section dividers use a minimal programmatic design (no organic blob shapes). Four exclusive layouts are available: `figure_panel`, `methods_box`, `sar_table`, `multi_chart`.
 
 ---
 
@@ -407,7 +410,7 @@ Italic runs render in gold italic. Use sparingly — no more than one in four sl
     "classification":  "Internal",         // Required: "Public" | "Internal" | "Confidential"
     "month_year":      "June 2026",        // Required: displayed on cover
     "audience":        "Leadership Team",  // Required: informs LLM tone
-    "deck_style":      "merck_corporate",  // Required: "merck_executive" | "merck_corporate" | "merck_storytelling"
+    "deck_style":      "merck_corporate",  // Required: "merck_executive" | "merck_corporate" | "merck_storytelling" | "merck_science"
     "color_theme":     "plastic",          // Required: "plastic" | "functional" | "organic" | "synthetic" | "technical" | "electronics"
     "variety_mode":    "default",          // Optional: "default" | "creative"
     "show_disclaimer": false,              // Optional: show legal disclaimer text
@@ -500,7 +503,7 @@ Before sharing a generated deck, verify:
 | Question | Where to look |
 |---|---|
 | Full design rules (colors, fonts, shapes) | `Merck_Presentation_Guidelines.md` |
-| CLI commands, Python API, full layout catalog | `README.md` |
+| How to use the tool, settings guide, layout overview | `README.md` |
 | Complete JSON schema for all 46 layouts | `LLM_PLAN_GUIDE.md` |
 | Branding questions | branding@merckgroup.com |
 | Brand Hub | https://brandhub.merckgroup.com |

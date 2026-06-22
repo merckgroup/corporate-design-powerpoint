@@ -816,7 +816,9 @@ def build_journey_map(prs, meta, action_title=None, phases=None, rows=None,
                  methodology_note=methodology_note)
 
     dark = _is_dark(style)
-    text_color = WHITE if dark else INK_DARK
+    # Cell backgrounds are always PANEL_LIGHT/WHITE (light) regardless of slide style,
+    # so cell body text must always be dark — never white even on storytelling dark slides.
+    text_color = INK_DARK
 
     phases    = list(phases or [])
     rows      = list(rows   or [])

@@ -1,245 +1,216 @@
 # Merck Corporate Design PPTX Tool
 
-Convert a markdown brief, an existing PowerPoint, or a hand-crafted slide plan into a polished **Merck Healthcare KGaA-branded `.pptx` deck** — without opening PowerPoint.
+Turn your content — a markdown document, an existing PowerPoint, or a detailed slide plan — into a polished **Merck Healthcare KGaA-branded `.pptx` deck**, automatically.
 
-## Quick Start
-
-```bash
-# From a markdown brief (calls Claude — needs AIP credentials)
-python -m merck_pptx generate brief.md output/deck.pptx --defaults
-
-# From an existing PowerPoint
-python -m merck_pptx generate old_deck.pptx output/deck_merck.pptx --defaults
-
-# From a finished slide plan (no Claude needed)
-python -m merck_pptx build plan.json output/deck.pptx
-```
-
-> **Setup and credentials:** [SETUP.md](SETUP.md)
+The tool handles all brand rules: the right template for your region, Merck colors and fonts, action titles on every slide, footer badges, and 48 layout types. You provide the content and make six decisions.
 
 ---
 
-## What it does
+## What it creates
+
+Every generated deck includes:
+
+- **Cover** with your title, authors, and date
+- **Agenda** derived automatically from your chapter structure
+- **Section dividers** and a closing slide
+- **Content slides** built to the Merck Corporate Design standard — correct template for your region, Merck fonts, purple action titles, classification badge, and page numbers
+
+All layout types are rendered programmatically — no manual PowerPoint editing needed for structure or branding.
+
+→ For the full brand specification: [Merck_Presentation_Guidelines.md](Merck_Presentation_Guidelines.md)
+
+---
+
+## Getting started
+
+**First-time setup** (Python environment, AIP credentials): → [SETUP.md](SETUP.md)
+
+Once set up, the fastest way to generate a deck:
+
+```bash
+python -m merck_pptx generate brief.md output/deck.pptx --defaults
+```
+
+This uses sensible defaults (EU region, Internal classification, Executive leadership audience, `merck_executive` style) and asks no questions. Drop `--defaults` to answer the six questions interactively instead.
+
+---
+
+## Three input types
 
 | Input | What happens |
 |---|---|
-| **Markdown document** (`.md`) | Claude reads your content, generates a slide plan, and builds the deck |
+| **Markdown document** (`.md`) | Claude reads your content, structures a slide plan, and builds the deck |
 | **Existing PowerPoint** (`.pptx` / `.ppt`) | Claude extracts the content, re-plans it in Merck style, and builds it fresh |
-| **Plan JSON** (`.json` or Python dict) | Builds directly — no Claude, fully deterministic |
-
-Every output deck follows the Merck brand: Merck purple, gold accents, action titles on every slide, takeaway bands, classification badges, and a consistent footer.
-
-### Starting from a markdown brief
-
-Write your content in any markdown document — no special format required. Headings, bullet lists, tables, and free-form prose all work. Claude reads the brief, structures a slide plan, and builds the deck. Use `--save-plan` to capture the generated plan as JSON so you can tweak and rebuild without another LLM call.
-
-A good brief includes: the core message or recommendation, supporting evidence, and key decisions or next steps. The richer the content, the better Claude can structure the narrative.
+| **Plan JSON** (`.json`) | Builds directly — no Claude, fully deterministic |
 
 ---
 
-## Three ways to call it
+## Writing your brief
 
-### 1 — CLI, interactive
+Write your content in any markdown file — no special format required. Headings, bullet lists, tables, and prose all work. A good brief includes:
 
-Run `generate` without `--meta` or `--defaults` and the pipeline asks six questions before calling Claude:
+- The core message or recommendation
+- Supporting evidence (data, findings, key results)
+- Key decisions or next steps
 
-```bash
-python -m merck_pptx generate brief.md output/deck.pptx
-```
+The richer your content, the better the slide structure. A one-sentence brief produces a minimal plan; a detailed 5-page document typically maps to 10–20 slides.
 
-The prompts cover region, classification, month/year, audience, visual style, and variety mode. The default style adapts to your audience: **executive** for Executive leadership and Senior management; **corporate** for all other audiences.
-
-### 2 — CLI, scripted (no prompts)
+**Inspect and refine the plan before building:**
 
 ```bash
-# Provide answers as a JSON file
-python -m merck_pptx generate brief.md output/deck.pptx --meta meta.json
-
-# Use built-in defaults (EU, Internal, Executive leadership, merck_executive)
-python -m merck_pptx generate brief.md output/deck.pptx --defaults
-```
-
-Save the generated plan for inspection or re-use:
-
-```bash
-python -m merck_pptx generate brief.md output/deck.pptx \
-    --meta meta.json \
-    --save-plan output/plan.json
-
-# Tweak plan.json, then rebuild without LLM:
+python -m merck_pptx generate brief.md output/deck.pptx --save-plan output/plan.json
+# Edit plan.json, then rebuild without calling Claude again:
 python -m merck_pptx build output/plan.json output/deck_revised.pptx
 ```
 
-### 3 — Python API
-
-```python
-from merck_pptx import generate_deck, build_from_plan
-
-# Markdown or pptx → Merck deck (calls Claude)
-generate_deck("brief.md", "output/deck.pptx", meta={
-    "region":         "EU",
-    "deck_label":     "Q2 Finance Review",
-    "classification": "Confidential",
-    "month_year":     "June 2026",
-    "audience":       "Executive leadership",
-    "deck_style":     "merck_executive",
-})
-
-# Plan dict or file → Merck deck (no Claude)
-build_from_plan(plan_dict, "output/deck.pptx")
-build_from_plan("plan.json", "output/deck.pptx")
-```
+This is useful when you want to adjust layout choices, reorder slides, or fine-tune wording without paying for another LLM call. See [merck_pptx/slide_plan_schema.md](merck_pptx/slide_plan_schema.md) for the plan format.
 
 ---
 
-## Meta fields
+## The five decisions that shape your deck
 
-Pass deck identity as a JSON file with `--meta`:
+When you run `generate` without `--defaults`, the tool asks five questions. Here is what each choice actually does to your deck.
 
-```json
-{
-  "region":         "EU",
-  "division":       "merck",
-  "color_theme":    "plastic",
-  "deck_label":     "Finance Systems Review",
-  "classification": "Confidential",
-  "month_year":     "June 2026",
-  "audience":       "Executive leadership",
-  "deck_style":     "merck_executive",
-  "variety_mode":    "default",
-  "show_disclaimer": false,
-  "chrome": {
-    "progress_bar":      false,
-    "section_circles":   false,
-    "takeaway_bands":    false,
-    "footer_breadcrumb": false
-  }
-}
-```
+### 1. Region
 
-| Field | Required | Valid values | Default |
-|---|---|---|---|
-| `region` | Yes | `EU` · `USA` | — |
-| `division` | No | `merck` · `emd_electronics` · `emd_serono` · `millipore_sigma` · `merck_asia` | `merck` |
-| `color_theme` | No | `plastic` · `functional` · `organic` · `synthetic` · `technical` · `electronics` | `plastic` |
-| `deck_label` | Yes | Any text — shown in the footer of every slide | — |
-| `classification` | Yes | `Public` · `Internal` · `Confidential` | — |
-| `month_year` | Yes | e.g. `"June 2026"` | — |
-| `audience` | Yes | `Executive leadership` · `Senior management` · `Functional team` · `Mixed audience` · `External / client-facing` | — |
-| `deck_style` | No | `merck_executive` · `merck_corporate` · `merck_storytelling` | `merck_executive` |
-| `variety_mode` | No | `default` (standard layouts) · `creative` (extended set) | `default` |
-| `show_disclaimer` | No | `true` for external-facing decks | `false` |
-| `chrome` | No | Object — opt-in custom chrome elements (see below) | `{}` = all off |
+`EU` or `USA`. This is a **compliance requirement**, not just a visual option.
 
-### `meta.chrome` — opt-in custom chrome elements
+- **EU** — uses the Merck KGaA (Darmstadt) template and disclaimer. For all global and European audiences.
+- **USA** — carries the EMD/MilliporeSigma legal disclaimer. For North America only.
 
-By default the pipeline produces **standard empower output**: Merck logo, classification badge, and page number only. Set any flag to `true` to add that element:
+Never use an EU deck for a USA audience and vice versa.
 
-| Flag | Effect |
+### 2. Audience
+
+Who will read this deck. This is the most impactful setting — it drives tone, layout density, and how Claude structures the narrative throughout the deck.
+
+| Audience | Effect on the deck |
 |---|---|
-| `progress_bar` | Thin proportional fill strip at the very top of each content slide |
-| `section_circles` | Numbered purple circles + spaced-caps category tag (top-left) |
-| `takeaway_bands` | Purple takeaway band above the footer; the LLM writes `takeaway` text only when this is `true` |
-| `footer_breadcrumb` | `"Deck Label • Category"` left-aligned in the slide footer |
+| `Executive leadership` | Tight layouts, concise text, strong action titles. Key slides (Executive Summary, Recommendation, Decision Request, Risk, Tradeoff) automatically switch to the most formal visual style. |
+| `Senior management` | Balanced — enough context for informed reading, structured for quick scanning. |
+| `Functional team` | More detail allowed, more granular layouts, less hierarchical structure. |
+| `Mixed audience` | Broadly readable balance of depth and brevity. |
+| `External / client-facing` | Client-appropriate tone; consider enabling `show_disclaimer` for externally shared decks. |
 
-All four are independent. Without this block the output matches standard empower exactly.
+You can type any free text — the values above are the recommended choices.
 
-**`region` is a compliance issue.** EU decks use the Merck KGaA (Darmstadt) template. USA/Canada decks carry a legal disclaimer restricting them to North America. Never mix the two.
+### 3. Deck style
 
-**`Secret` and above block the build.** If `Secret`, `Top Secret`, or `TS/SCI` is entered as classification, the pipeline exits immediately.
+Controls the visual weight and feel of every **content slide**. Color theme (below) is a separate, independent setting that controls the cover palette — the two do not interact.
 
-> **How `division` and `color_theme` interact:** `division` selects the template *file* (logo and disclaimer). `color_theme` changes the *colour palette* (applied in code, no extra file needed). Set them independently — any combination works.
-
----
-
-## Templates and visual options
-
-### Region
-
-| Value | Template family | When to use |
+| Style | What it looks like | Best for |
 |---|---|---|
-| `EU` *(default)* | `EU_Merck_Themed.pptx` | Merck KGaA (Darmstadt) — all EU/global audiences |
-| `USA` | `USA_Merck_Themed_Base_v1.pptx` | North America only — carries the legal EMD disclaimer |
+| `merck_executive` | White background, rich purple headings, tight formal layout | Board decks, C-suite sign-offs, formal decisions |
+| `merck_corporate` | White background, standard proportions, moderate density | Project updates, town halls, general business decks |
+| `merck_storytelling` | **Dark purple** background, white text, bold and visual | Product launches, change management, communications |
+| `merck_science` | White background, **Merck Blue** accent, dark-ink titles, data-dense | Pharma lab reports, early-research progress reviews |
 
-### Division
+**Some slides always look formal, regardless of your choice.** If your content includes an Executive Summary, a Recommendation, a Decision Request, a Risk, or a Tradeoff slide, those specific slides will always use the tight, authoritative `merck_executive` look — even if the rest of your deck is in `merck_corporate` or `merck_storytelling`. The reasoning: a budget decision or a risk slide always deserves the most serious visual treatment, whatever the surrounding deck looks like.
 
-`division` selects the sub-brand template file (logo, wordmark, disclaimer). Missing files fall back to the region default. See [SETUP.md](SETUP.md) for the full template file table and instructions for adding new division templates.
+**`merck_science` is the exception:** Auto-promotion is deliberately suppressed. In a lab progress report, even a Risk or Recommendation slide should look like the rest of the data deck — not like a boardroom judgment slide. The entire deck stays consistently data-first. Four science-specific layouts are also unlocked: `figure_panel` (multi-panel figure grids), `methods_box` (experimental conditions + key result), `sar_table` (SAR/ADMET wide data tables), and `multi_chart` (2 or 4 small charts side by side).
 
-### Color theme
+### 4. Color theme
 
-Applied programmatically — no extra template file needed.
+Controls the **cover slide and section divider palette only** — not the content slides. Think of it as the "opening color" of your deck. Content slide backgrounds are always white (or dark purple for `merck_storytelling`) regardless of which theme you pick.
 
-| Theme | Cover background | Accent | Best for |
+| Theme | Cover & dividers | Accent | Best for |
 |---|---|---|---|
-| `plastic` *(default)* | Lime green `#A5CD50` | Pink `#EB3C96` | General-purpose |
-| `functional` | Lime green `#A5CD50` | Teal `#2DBECD` | Life science, biology |
-| `organic` | Cream `#FFDCB9` | Red `#E61E50` | Healthcare, patient focus |
-| `synthetic` | Violet `#503291` | Yellow `#FFC832` | Industrial, chemistry |
-| `technical` | Cream `#FFDCB9` | Teal `#2DBECD` | Engineering, IT |
-| `electronics` | Violet `#503291` | Yellow `#FFC832` | EMD Electronics (photo cover) |
+| `plastic` *(default)* | Lime green | Pink | General purpose |
+| `functional` | Lime green | Teal | Life science, biology, cells |
+| `organic` | Cream | Red | Healthcare, patient-focused |
+| `synthetic` | Dark violet | Yellow | Industrial, chemistry |
+| `technical` | Cream | Teal | Engineering, IT, data |
+| `electronics` | Dark violet | Yellow | EMD Electronics (adds a photo placeholder on the cover) |
 
-The `electronics` cover uses a "Title with picture" layout — the image placeholder is left empty for you to fill in PowerPoint after generation.
+For biology and life science presentations, `functional` is the natural fit. For healthcare and patient-facing content, choose `organic`.
 
-### Visual style
+### 5. Classification
 
-| Style | Background | Best for |
-|---|---|---|
-| `merck_executive` | White | Board decks, formal decisions |
-| `merck_corporate` | White | Project updates, town halls, general business |
-| `merck_storytelling` | Dark purple | Product launches, change management |
+Sets the badge shown on every slide footer.
 
-**Auto-promotion:** Five slide types are always forced to `merck_executive` regardless of the deck's style: Executive Summary, Recommendation, Decision Request, Risk, and Tradeoff.
+| Value | When to use |
+|---|---|
+| `Public` | Content approved for external audiences |
+| `Internal` | For Merck employees only |
+| `Confidential` | Sensitive internal content |
+
+`Secret` and above will immediately stop the build — do not use these.
+
+### Variety mode — leave it at `default` for most decks
+
+There is a sixth parameter, `variety_mode`, but for most decks you do not need to think about it.
+
+`default` gives Claude 28 layouts covering the core business and science use cases. `creative` adds 18 more:
+
+| Layout | Use case |
+|---|---|
+| `donut_chart` | Part-of-whole breakdown (e.g. revenue by therapy area) |
+| `kpi_dashboard` | 4–6 KPIs with traffic-light status and trend arrows |
+| `radar_chart` | Multi-axis capability or spider assessment |
+| `risk_heatmap` | Risks plotted by likelihood and impact |
+| `score_table` | Scoring matrix or Harvey Ball ratings |
+| `comparison_table` | N options × M criteria evaluation (e.g. vendor selection) |
+| `funnel` | Inputs narrowing to a single output |
+| `journey_map` | Multi-actor journey across phases (e.g. patient journey) |
+| `pros_cons` | Explicit pros vs. cons for a named topic |
+| `venn` | Two or three overlapping concepts with a shared zone |
+| `influence_diagram` | Forces acting on a central outcome |
+| `word_cloud` | Word frequency or theme visualization |
+| `pyramid` | Hierarchical levels (e.g. vision → strategy → execution) |
+| `layered_stack` | Architecture or technology stack |
+| `photo_text` | Large image with bullet text alongside |
+| `pull_quote` | Big attributed statement or impactful single sentence |
+| `fishbone` | Cause-and-effect diagram (Ishikawa) |
+| `icon_grid` | Grid of named icons with short descriptions |
+
+> `default` exists as a guardrail: with 48 options available, Claude occasionally reaches for an unusual layout when a simpler one would be better. Your audience and deck style already guide tone and density — variety mode simply constrains the layout toolkit to the most predictable core set.
 
 ---
 
-## Building from a plan
+## Choosing layouts
 
-To control every slide yourself, write a plan JSON and pass it to `build`. Claude is not called — the build is fully deterministic.
+Claude picks layouts automatically from your brief content — this is separate from the color theme, which only affects the cover palette. Layout choice is about *structure* (how content is arranged on the slide); color theme is about *palette* (what colors appear on the cover and chapter breaks).
 
-**Key rules:**
+You can guide Claude's layout choices by structuring your markdown:
 
-- `section_number` must be a unique sequential integer on every content slide. Structural slides (Cover, Agenda, Section Divider, Close) use `null`.
-- `style: "inherit"` resolves to the deck's `deck_style` at build time.
-- The **agenda auto-fills**: leave `content.chapters` empty and the pipeline derives the chapter list from your content slides automatically.
-- **Appendix slides**: add `"appendix": true` to any slide to exclude it from the main page count. Appendix slides are numbered A1, A2… in the footer.
+- A table tends to produce a comparison or status table layout
+- A numbered list tends to produce a process or vertical-numbered layout
+- A single key number tends to produce a hero stat layout
+- A section titled "Decisions" tends to produce a decision rows layout
 
-For the full plan schema, slide field reference, and all 46 layout content payloads, see [`merck_pptx/slide_plan_schema.md`](merck_pptx/slide_plan_schema.md).
-
----
-
-## Layout catalog
-
-46 layouts across two tiers. `variety_mode: "default"` covers everyday consulting decks; `"creative"` unlocks the full set.
+The 48 layouts are grouped by purpose. Layouts marked `†` require `variety_mode: "creative"`. Layouts marked `‡` require `deck_style: "merck_science"`.
 
 **Cover and navigation** — `cover` · `exec_summary` · `agenda` · `section_divider` · `close`
 
-**Evidence and data** — `chart_slide` · `waterfall_slide` · `stat_strip` · `hero_stat` · `donut_chart` · `radar_chart` · `risk_heatmap` · `kpi_dashboard` · `score_table` · `word_cloud`
+**Evidence and data** — `chart_slide` · `waterfall_slide` · `stat_strip` · `hero_stat` · `donut_chart`† · `radar_chart`† · `risk_heatmap`† · `kpi_dashboard`† · `score_table`† · `word_cloud`†
 
-**Argument and structure** — `two_column` · `three_column` · `four_column` · `columns` · `vertical_numbered` · `label_rows` · `before_after` · `pros_cons` · `2x2_matrix`
+**Argument and structure** — `two_column` · `three_column` · `four_column` · `columns` · `vertical_numbered` · `label_rows` · `before_after` · `pros_cons`† · `2x2_matrix`
 
-**Process and timelines** — `phase_process` · `gantt` · `milestone_timeline` · `circular_flow` · `arrow_chain` · `funnel` · `journey_map` · `road_to_success`
+**Process and timelines** — `phase_process` · `gantt` · `milestone_timeline` · `circular_flow` · `arrow_chain` · `funnel`† · `journey_map`† · `road_to_success`
 
-**Decisions and tables** — `decision_rows` · `status_table` · `comparison_table`
+**Decisions and tables** — `decision_rows` · `status_table` · `comparison_table`†
 
-**Organisation and relationships** — `org_chart` · `hub_spoke` · `pillar_detail` · `topic_set` · `icon_grid`
+**Organisation and relationships** — `org_chart` · `hub_spoke` · `pillar_detail` · `topic_set` · `icon_grid`†
 
-**Visual and narrative** — `pull_quote` · `key_question` · `pyramid` · `venn` · `layered_stack` · `influence_diagram` · `photo_text` · `fishbone`
+**Visual and narrative** — `pull_quote`† · `key_question` · `pyramid`† · `venn`† · `layered_stack`† · `influence_diagram`† · `photo_text`† · `fishbone`†
 
-For layout use-cases, content schemas, and the pre-send checklist, see [Merck_Presentation_Helper.md](Merck_Presentation_Helper.md).
+**Science layouts** (`deck_style: "merck_science"` required) — `figure_panel`‡ · `methods_box`‡ · `sar_table`‡ · `multi_chart`‡
 
-> **Note on Merck branded visual assets (Mercrobes, etc.):** Some empower library elements — including the 3D organic sphere icons ("Mercrobes") — exist only on the empower server and are not embedded by this pipeline. The pipeline generates all shapes programmatically using python-pptx.
+→ For layout use-cases, content examples, and the pre-send checklist: [Merck_Presentation_Helper.md](Merck_Presentation_Helper.md)
+
+> **Note on Merck visual assets:** Some empower library elements — including the 3D organic sphere icons ("Mercrobes") — exist only on the empower server and are not generated by this pipeline. All shapes are built programmatically.
 
 ---
 
-## Companion documents
+## Going further
 
-| Document | For whom | What it covers |
-|---|---|---|
-| [SETUP.md](SETUP.md) | First-time setup | Installation, credentials, division template files, troubleshooting |
-| [Merck_Presentation_Helper.md](Merck_Presentation_Helper.md) | Humans building a deck | Layout picker, content schemas, color rules, pre-send checklist |
-| [merck_pptx/slide_plan_schema.md](merck_pptx/slide_plan_schema.md) | Anyone writing a plan JSON | Full plan schema, all 46 layout payloads, field name rules |
-| [LLM_PLAN_GUIDE.md](LLM_PLAN_GUIDE.md) | LLMs generating a plan | Same as above, optimised for LLM consumption |
-| [Merck_Presentation_Guidelines.md](Merck_Presentation_Guidelines.md) | Brand governance | Exact color values, typography, accessibility, brand rules |
+| Resource | When to open it |
+|---|---|
+| [SETUP.md](SETUP.md) | First-time installation, credentials, adding division templates |
+| [Merck_Presentation_Helper.md](Merck_Presentation_Helper.md) | Layout picker with use-cases, content schemas, color rules, pre-send checklist |
+| [Merck_Presentation_Guidelines.md](Merck_Presentation_Guidelines.md) | Brand rules, exact color values, typography, accessibility |
+| [merck_pptx/slide_plan_schema.md](merck_pptx/slide_plan_schema.md) | Writing or editing a plan JSON by hand |
+| [LLM_PLAN_GUIDE.md](LLM_PLAN_GUIDE.md) | Technical reference for LLMs or scripts generating a plan; Python API |
 
 ---
 

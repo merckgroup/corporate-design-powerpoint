@@ -245,16 +245,17 @@ def add_image(slide, image_path, x, y, w=None, h=None):
 
 
 def add_slide_jump_hyperlink(shape, target_slide):
-    """Make a shape's text a clickable jump to target_slide. Works by
-    creating a slide-jump relationship on the source slide part and
-    wrapping each <a:r> text run with an <a:hlinkClick> element pointing
-    at that relationship via r:id, plus action='ppaction://hlinksldjump'.
+    """Make a shape jump to target_slide when clicked.
 
-    Used by the canonical runner to make agenda chapter rows clickable.
+    Uses a SHAPE-LEVEL click action stored in <p:cNvPr> rather than
+    text-run-level <a:hlinkClick> inside <a:rPr>.  The text-run approach
+    causes PowerPoint to override the explicit text fill color with the
+    theme's hlink scheme color — invisible on dark slides (e.g. the organic
+    theme's hlink is Merck purple, same as the storytelling background).
+    The shape-level approach keeps the entire shape clickable without
+    touching any text formatting.
     """
     from lxml import etree
-    if not shape.has_text_frame:
-        return
     src_part = shape.part
     try:
         rId = src_part.relate_to(
@@ -264,19 +265,25 @@ def add_slide_jump_hyperlink(shape, target_slide):
         )
     except Exception:
         return
-    tx_body = shape.text_frame._txBody
-    for r in tx_body.iter(qn("a:r")):
-        rPr = r.find(qn("a:rPr"))
-        if rPr is None:
-            rPr = etree.SubElement(r, qn("a:rPr"))
-            # rPr must be the FIRST child of <a:r> per OOXML schema.
-            r.insert(0, rPr)
-        # Remove any existing hlinkClick before adding ours.
-        for existing in rPr.findall(qn("a:hlinkClick")):
-            rPr.remove(existing)
-        hlink = etree.SubElement(rPr, qn("a:hlinkClick"))
-        hlink.set(qn("r:id"), rId)
-        hlink.set("action", "ppaction://hlinksldjump")
+
+    sp_elem = shape._element
+    nvSpPr  = sp_elem.find(qn("p:nvSpPr"))
+    if nvSpPr is None:
+        return
+    cNvPr = nvSpPr.find(qn("p:cNvPr"))
+    if cNvPr is None:
+        return
+
+    A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
+    R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+
+    # Remove any pre-existing shape-level hlinkClick.
+    for existing in cNvPr.findall(f"{{{A_NS}}}hlinkClick"):
+        cNvPr.remove(existing)
+
+    hlink = etree.SubElement(cNvPr, f"{{{A_NS}}}hlinkClick")
+    hlink.set(f"{{{R_NS}}}id", rId)
+    hlink.set("action", "ppaction://hlinksldjump")
 
 
 def add_speaker_notes(slide, notes):

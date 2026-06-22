@@ -376,7 +376,7 @@ def build_pillar_detail(prs, meta, action_title=None, pillar_number=None, pillar
         _track_letters(str(pillar_label or "PILLAR").upper()),
         sz=11, color=pal["highlight"], bold=True, font=FONT_BODY)
 
-    # Huge number (Merck Web — hero moment).
+    # Huge number (Merck / FONT_HEAD — hero moment).
     txt(slide, panel_x, panel_y + Inches(0.65),
         panel_w, panel_h - Inches(1.80),
         str(pillar_number or ""), sz=120, color=WHITE, bold=True,
