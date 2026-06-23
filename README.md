@@ -2,7 +2,7 @@
 
 Turn your content — a markdown document, an existing PowerPoint, or a detailed slide plan — into a polished **Merck Healthcare KGaA-branded `.pptx` deck**, automatically.
 
-The tool handles all brand rules: the right template for your region, Merck colors and fonts, action titles on every slide, footer badges, and 48 layout types. You provide the content and make six decisions.
+The tool handles all brand rules: the right template for your region, Merck colors and fonts, action titles on every slide, footer badges, and 46 layout types. You provide the content and make six decisions.
 
 ---
 
@@ -31,7 +31,7 @@ Once set up, the fastest way to generate a deck:
 python -m merck_pptx generate brief.md output/deck.pptx --defaults
 ```
 
-This uses sensible defaults (EU region, Internal classification, Mixed audience, `merck_corporate` style, `organic` color theme) and asks no questions. Drop `--defaults` to answer the six questions interactively instead.
+This uses sensible defaults (EU region, Internal classification, Executive leadership audience, `merck_executive` style) and asks no questions. Drop `--defaults` to answer the six questions interactively instead.
 
 ---
 
@@ -103,11 +103,8 @@ Controls the visual weight and feel of every **content slide**. Color theme (bel
 | `merck_executive` | White background, rich purple headings, tight formal layout | Board decks, C-suite sign-offs, formal decisions |
 | `merck_corporate` | White background, standard proportions, moderate density | Project updates, town halls, general business decks |
 | `merck_storytelling` | **Dark purple** background, white text, bold and visual | Product launches, change management, communications |
-| `merck_science` | White background, **Merck Blue** accent, dark-ink titles, data-dense | Pharma lab reports, early-research progress reviews |
 
 **Some slides always look formal, regardless of your choice.** If your content includes an Executive Summary, a Recommendation, a Decision Request, a Risk, or a Tradeoff slide, those specific slides will always use the tight, authoritative `merck_executive` look — even if the rest of your deck is in `merck_corporate` or `merck_storytelling`. The reasoning: a budget decision or a risk slide always deserves the most serious visual treatment, whatever the surrounding deck looks like.
-
-**`merck_science` is the exception:** Auto-promotion is deliberately suppressed. In a lab progress report, even a Risk or Recommendation slide should look like the rest of the data deck — not like a boardroom judgment slide. The entire deck stays consistently data-first. Four science-specific layouts are also unlocked: `figure_panel` (multi-panel figure grids), `methods_box` (experimental conditions + key result), `sar_table` (SAR/ADMET wide data tables), and `multi_chart` (2 or 4 small charts side by side).
 
 ### 4. Color theme
 
@@ -136,34 +133,13 @@ Sets the badge shown on every slide footer.
 
 `Secret` and above will immediately stop the build — do not use these.
 
-### Variety mode — leave it at `default` for most decks
+### Variety mode — leave it at `default`
 
-There is a sixth parameter, `variety_mode`, but for most decks you do not need to think about it.
+There is a sixth parameter, `variety_mode`, but for most decks you do not need to think about it. Leave it at `default`.
 
-`default` gives Claude 28 layouts covering the core business and science use cases. `creative` adds 18 more:
+`default` gives Claude 30 layouts — the standard set for business, science, and project presentations. `creative` adds 16 more visually distinctive layouts: word cloud, fishbone (cause-and-effect), pyramid, layered stack, photo panels. Use `creative` only if you are making a communications or research presentation and specifically want those styles.
 
-| Layout | Use case |
-|---|---|
-| `donut_chart` | Part-of-whole breakdown (e.g. revenue by therapy area) |
-| `kpi_dashboard` | 4–6 KPIs with traffic-light status and trend arrows |
-| `radar_chart` | Multi-axis capability or spider assessment |
-| `risk_heatmap` | Risks plotted by likelihood and impact |
-| `score_table` | Scoring matrix or Harvey Ball ratings |
-| `comparison_table` | N options × M criteria evaluation (e.g. vendor selection) |
-| `funnel` | Inputs narrowing to a single output |
-| `journey_map` | Multi-actor journey across phases (e.g. patient journey) |
-| `pros_cons` | Explicit pros vs. cons for a named topic |
-| `venn` | Two or three overlapping concepts with a shared zone |
-| `influence_diagram` | Forces acting on a central outcome |
-| `word_cloud` | Word frequency or theme visualization |
-| `pyramid` | Hierarchical levels (e.g. vision → strategy → execution) |
-| `layered_stack` | Architecture or technology stack |
-| `photo_text` | Large image with bullet text alongside |
-| `pull_quote` | Big attributed statement or impactful single sentence |
-| `fishbone` | Cause-and-effect diagram (Ishikawa) |
-| `icon_grid` | Grid of named icons with short descriptions |
-
-> `default` exists as a guardrail: with 48 options available, Claude occasionally reaches for an unusual layout when a simpler one would be better. Your audience and deck style already guide tone and density — variety mode simply constrains the layout toolkit to the most predictable core set.
+> The reason this parameter exists: with 46 options available, Claude occasionally reaches for an unusual layout (a word cloud where a two-column would be better). `default` keeps choices conservative and predictable. Your audience and deck style already guide layout density and formality — variety mode is simply a guardrail on the full layout toolkit.
 
 ---
 
@@ -178,23 +154,21 @@ You can guide Claude's layout choices by structuring your markdown:
 - A single key number tends to produce a hero stat layout
 - A section titled "Decisions" tends to produce a decision rows layout
 
-The 48 layouts are grouped by purpose. Layouts marked `†` require `variety_mode: "creative"`. Layouts marked `‡` require `deck_style: "merck_science"`.
+The 46 layouts are grouped by purpose:
 
 **Cover and navigation** — `cover` · `exec_summary` · `agenda` · `section_divider` · `close`
 
-**Evidence and data** — `chart_slide` · `waterfall_slide` · `stat_strip` · `hero_stat` · `donut_chart`† · `radar_chart`† · `risk_heatmap`† · `kpi_dashboard`† · `score_table`† · `word_cloud`†
+**Evidence and data** — `chart_slide` · `waterfall_slide` · `stat_strip` · `hero_stat` · `donut_chart` · `radar_chart` · `risk_heatmap` · `kpi_dashboard` · `score_table` · `word_cloud`
 
-**Argument and structure** — `two_column` · `three_column` · `four_column` · `columns` · `vertical_numbered` · `label_rows` · `before_after` · `pros_cons`† · `2x2_matrix`
+**Argument and structure** — `two_column` · `three_column` · `four_column` · `columns` · `vertical_numbered` · `label_rows` · `before_after` · `pros_cons` · `2x2_matrix`
 
-**Process and timelines** — `phase_process` · `gantt` · `milestone_timeline` · `circular_flow` · `arrow_chain` · `funnel`† · `journey_map`† · `road_to_success`
+**Process and timelines** — `phase_process` · `gantt` · `milestone_timeline` · `circular_flow` · `arrow_chain` · `funnel` · `journey_map` · `road_to_success`
 
-**Decisions and tables** — `decision_rows` · `status_table` · `comparison_table`†
+**Decisions and tables** — `decision_rows` · `status_table` · `comparison_table`
 
-**Organisation and relationships** — `org_chart` · `hub_spoke` · `pillar_detail` · `topic_set` · `icon_grid`†
+**Organisation and relationships** — `org_chart` · `hub_spoke` · `pillar_detail` · `topic_set` · `icon_grid`
 
-**Visual and narrative** — `pull_quote`† · `key_question` · `pyramid`† · `venn`† · `layered_stack`† · `influence_diagram`† · `photo_text`† · `fishbone`†
-
-**Science layouts** (`deck_style: "merck_science"` required) — `figure_panel`‡ · `methods_box`‡ · `sar_table`‡ · `multi_chart`‡
+**Visual and narrative** — `pull_quote` · `key_question` · `pyramid` · `venn` · `layered_stack` · `influence_diagram` · `photo_text` · `fishbone`
 
 → For layout use-cases, content examples, and the pre-send checklist: [Merck_Presentation_Helper.md](Merck_Presentation_Helper.md)
 

@@ -46,11 +46,17 @@ CONFIG_TEMPLATE = """\
 # DO NOT commit this file to git (it is gitignored).
 
 empower:
-  # Path to the empower BinaryFiles cache (contains per-slide PPTX assets).
+  # Path to the empower BinaryFiles cache (contains per-theme PPTX assets).
   # Set enabled: false to disable all empower integration.
   enabled: {empower_enabled}
   binary_dir:    "{binary_dir}"
   thumbnail_dir: "{thumbnail_dir}"
+
+manual_templates:
+  # Path to the user-managed manual template folder.
+  # Place files here as {{division}}_{{color_theme}}.pptx  e.g. merck_organic.pptx
+  # Leave empty (dir: "") to use the default: ~/.merck_pptx/templates/
+  dir: ""
 
 # To override paths on a different machine, edit this file or re-run setup.
 # Supported variables: {{username}}, {{home}}, {{appdata}}, {{localappdata}}
@@ -149,10 +155,32 @@ def detect_empower() -> tuple[bool, str, str]:
         _ok(f"  ThumbnailLarge: {n_thumbnail} thumbnails")
         return True, str(binary_dir), str(thumbnail_dir)
     else:
-        _warn(f"empower cache not found at: {empower_root}")
-        _warn("  Cover shape morphology will use the default template shapes.")
-        _warn("  Install the empower PowerPoint add-in to enable this feature:")
-        _warn("  https://evarooms.merckgroup.com/Topic/MerckBrandCMB")
+        _warn(f"empower not found at: {empower_root}")
+        _warn("  BinaryFile templates are unavailable on this machine.")
+        print()
+        print("  For Mac/Linux users (or Windows without empower):")
+        print("  You can download individual templates manually instead.")
+        print()
+        manual_dir = pathlib.Path.home() / ".merck_pptx" / "templates"
+        print(f"  1. Ask a Windows colleague to export a template from PowerPoint:")
+        print( "       empower tab -> Corporate Design Templates -> Master Templates")
+        print( "       Right-click a template -> Export to file -> save as .pptx")
+        print()
+        print(f"  2. Place the file in:  {manual_dir}")
+        print( "     Named as:           {{division}}_{{color_theme}}.pptx")
+        print( "     Examples:           merck_organic.pptx")
+        print( "                         emd_serono_plastic.pptx")
+        print()
+        print( "  3. Re-run this setup to confirm the template is recognised.")
+        print()
+        print( "  Valid division keys:    merck  merck_asia  emd_serono")
+        print( "                          millipore_sigma  emd_electronics  usa")
+        print( "  Valid color_theme keys: plastic  functional  organic")
+        print( "                          synthetic  technical  electronics")
+        print()
+        print( "  Note: division='merck' works without any download -- the bundled")
+        print( "  EU_Merck_Themed.pptx / USA_Merck_Themed_Base_v1.pptx cover all")
+        print( "  6 color themes for the 'merck' division out of the box.")
         return False, str(binary_dir), str(thumbnail_dir)
 
 
@@ -184,11 +212,111 @@ def write_config(empower_found: bool, binary_dir: str, thumbnail_dir: str):
 
 
 # ---------------------------------------------------------------------------
-# Step 5: Import smoke test
+# Step 5: Scan available templates
+# ---------------------------------------------------------------------------
+
+def scan_available_templates(binary_dir_str: str, empower_found: bool):
+    """Print a catalogue of every template available on this machine."""
+    _header("Step 5 — Available templates")
+
+    bundled_count = 0
+    empower_count = 0
+    manual_count  = 0
+
+    # ---- bundled ---------------------------------------------------------
+    print("  [bundled]  -- always available, no download needed")
+    try:
+        # Access the package templates directory relative to this script
+        pkg_dir = pathlib.Path(__file__).parent / "merck_pptx" / "templates"
+        eu_ok  = (pkg_dir / "EU_Merck_Themed.pptx").exists()
+        usa_ok = (pkg_dir / "USA_Merck_Themed_Base_v1.pptx").exists()
+        if eu_ok:
+            _ok("eu  / merck  ->  EU_Merck_Themed.pptx  (all 6 color themes)")
+            bundled_count += 1
+        else:
+            _fail("eu  / merck  ->  EU_Merck_Themed.pptx  NOT FOUND (package incomplete)")
+        if usa_ok:
+            _ok("usa / merck  ->  USA_Merck_Themed_Base_v1.pptx  (all 6 color themes)")
+            bundled_count += 1
+        else:
+            _warn("usa / merck  ->  USA_Merck_Themed_Base_v1.pptx  not present")
+        print("       (color themes are applied programmatically -- no separate")
+        print("        file is needed per theme for the 'merck' division)")
+    except Exception as exc:
+        _warn(f"Could not check bundled templates: {exc}")
+
+    # ---- empower ---------------------------------------------------------
+    print()
+    if not empower_found:
+        print("  [empower BinaryFiles]  NOT FOUND -- empower is not installed")
+        print("    (see instructions above for the manual download alternative)")
+    else:
+        binary_dir = pathlib.Path(binary_dir_str)
+        print(f"  [empower BinaryFiles]  --  {binary_dir}")
+        try:
+            from merck_pptx.binary_templates import load_registry, uid_to_path
+            from merck_pptx.manual_templates import VALID_THEMES as _ALL_THEMES
+            registry = load_registry()
+            if not registry:
+                _warn("Registry is empty -- run 'python -m merck_pptx discover-templates'")
+            else:
+                for div, themes in sorted(registry.items()):
+                    if div.startswith("_") or not isinstance(themes, dict):
+                        continue
+                    present = []
+                    missing = []
+                    for theme in _ALL_THEMES:
+                        uid = themes.get(theme)
+                        if uid:
+                            p = uid_to_path(uid)
+                            if p is not None:
+                                present.append(theme)
+                            else:
+                                missing.append(theme + "(!)")
+                    if present:
+                        _ok(f"{div:<22} {', '.join(present)}")
+                        empower_count += len(present)
+                    if missing:
+                        _warn(f"{div:<22} {', '.join(missing)}  "
+                              "(registered but file missing -- reinstall empower?)")
+        except Exception as exc:
+            _warn(f"Could not read empower registry: {exc}")
+
+    # ---- manual ----------------------------------------------------------
+    print()
+    try:
+        from merck_pptx.manual_templates import manual_templates_dir, list_manual_templates
+        mdir = manual_templates_dir()
+        print(f"  [manual]  --  {mdir}")
+        manual = list_manual_templates()
+        if not mdir.exists():
+            print("    (directory does not exist yet -- create it to add templates)")
+        elif not manual:
+            print("    (no recognised .pptx files found)")
+            print("    Name files as {division}_{color_theme}.pptx to add them here")
+        else:
+            for entry in manual:
+                _ok(f"{entry['division']:<22} {entry['color_theme']:<12}  {pathlib.Path(entry['path']).name}")
+                manual_count += 1
+    except Exception as exc:
+        _warn(f"Could not scan manual templates: {exc}")
+
+    # ---- summary ---------------------------------------------------------
+    print()
+    total = bundled_count * 6 + empower_count + manual_count
+    print(f"  Total: {bundled_count} bundled divisions (x6 themes)"
+          f" + {empower_count} empower + {manual_count} manual"
+          f" = {total} available template combination(s)")
+    print()
+    print("  Run anytime:  python -m merck_pptx list-templates")
+
+
+# ---------------------------------------------------------------------------
+# Step 6: Import smoke test
 # ---------------------------------------------------------------------------
 
 def smoke_test():
-    _header("Step 5 — Import smoke test")
+    _header("Step 6 — Import smoke test")
     try:
         import merck_pptx
         _ok("merck_pptx imported successfully")
@@ -220,12 +348,14 @@ def main():
     install_packages()
     empower_found, binary_dir, thumbnail_dir = detect_empower()
     write_config(empower_found, binary_dir, thumbnail_dir)
+    scan_available_templates(binary_dir, empower_found)
     smoke_test()
 
     _sep()
     print()
     print("  Setup complete.")
     print("  Run 'python -m merck_pptx build plan.json output.pptx' to generate a deck.")
+    print("  Run 'python -m merck_pptx list-templates' to see available templates.")
     print()
 
 

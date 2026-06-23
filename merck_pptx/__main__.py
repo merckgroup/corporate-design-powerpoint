@@ -137,6 +137,101 @@ def _validate_meta_dict(meta: dict) -> None:
         )
 
 
+def _cmd_list_templates():
+    """Print a catalogue of all available Merck PPTX templates from every source."""
+    import pathlib
+    from merck_pptx.build_from_plan import _TEMPLATE_DIR
+    from merck_pptx.manual_templates import VALID_THEMES as _ALL_THEMES
+
+    _SEP = "-" * 60
+
+    print()
+    print("  Available Merck PPTX templates")
+    print(_SEP)
+
+    # ------------------------------------------------------------------ bundled
+    print()
+    print("  [1] Bundled templates  (always available, no download needed)")
+    eu_tmpl  = _TEMPLATE_DIR / "EU_Merck_Themed.pptx"
+    usa_tmpl = _TEMPLATE_DIR / "USA_Merck_Themed_Base_v1.pptx"
+    _eu_ok  = "[OK]" if eu_tmpl.exists()  else "[MISSING]"
+    _usa_ok = "[OK]" if usa_tmpl.exists() else "[MISSING]"
+    print(f"    {_eu_ok}  eu  / merck  ->  {eu_tmpl.name}  (all 6 color themes)")
+    print(f"    {_usa_ok}  usa / merck  ->  {usa_tmpl.name}  (all 6 color themes)")
+    print("       Note: color themes are applied programmatically -- no separate")
+    print("             file needed per theme for the 'merck' division.")
+
+    # --------------------------------------------------------- empower BinaryFiles
+    print()
+    print("  [2] empower BinaryFiles  (Windows, empower add-in required)")
+    try:
+        from merck_pptx.binary_templates import load_registry, uid_to_path, _binary_dir
+        bdir = pathlib.Path(_binary_dir())
+        registry = load_registry()
+        if not bdir.exists():
+            print(f"    [NOT FOUND]  empower cache directory not found:")
+            print(f"                 {bdir}")
+            print("    Install empower or use Option B (manual download) below.")
+        else:
+            total_empower = 0
+            for div, themes in sorted(registry.items()):
+                if div.startswith("_"):
+                    continue
+                if not isinstance(themes, dict):
+                    continue
+                present = []
+                missing = []
+                for theme in _ALL_THEMES:
+                    uid = themes.get(theme)
+                    if uid:
+                        p = uid_to_path(uid)
+                        if p is not None:
+                            present.append(theme)
+                        else:
+                            missing.append(theme)
+                if present:
+                    print(f"    [OK]  {div:<20}  {', '.join(present)}")
+                    total_empower += len(present)
+                if missing:
+                    print(f"    [REG/MISSING] {div:<18}  {', '.join(missing)}  "
+                          "(registered but file absent -- reinstall empower?)")
+            if total_empower == 0:
+                print("    (registry is empty -- run 'discover-templates' to scan)")
+            else:
+                print(f"\n    {total_empower} empower template(s) available")
+    except Exception as exc:
+        print(f"    [ERROR] Could not scan empower BinaryFiles: {exc}")
+
+    # ---------------------------------------------------------- manual templates
+    print()
+    print("  [3] Manual templates  (~/.merck_pptx/templates/)")
+    try:
+        from merck_pptx.manual_templates import manual_templates_dir, list_manual_templates
+        mdir = manual_templates_dir()
+        manual = list_manual_templates()
+        print(f"    Directory: {mdir}")
+        if not mdir.exists():
+            print("    [EMPTY]  Directory does not exist yet.")
+        elif not manual:
+            print("    [EMPTY]  No recognised template files found.")
+        else:
+            for entry in manual:
+                print(f"    [OK]  {entry['division']:<20}  {entry['color_theme']}")
+            print(f"\n    {len(manual)} manual template(s) available")
+        print()
+        print("    To add templates: place .pptx files named {division}_{color_theme}.pptx")
+        print(f"    in the directory above.  Example: emd_serono_organic.pptx")
+        print("    Then re-run this command to confirm they are recognised.")
+    except Exception as exc:
+        print(f"    [ERROR] Could not scan manual templates: {exc}")
+
+    print()
+    print(_SEP)
+    print("  Run 'python setup_merck_pptx.py' to auto-detect empower and")
+    print("  get full instructions for downloading templates manually.")
+    print()
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="python -m merck_pptx",
@@ -165,6 +260,12 @@ def main():
         help="Scan empower BinaryFiles and show all available themed templates",
     )
 
+    # list-templates command
+    sub.add_parser(
+        "list-templates",
+        help="Show all available Merck templates (bundled, empower, and manual)",
+    )
+
     # register-template command
     reg = sub.add_parser(
         "register-template",
@@ -177,7 +278,7 @@ def main():
     args = parser.parse_args()
 
     if args.command == "build":
-        from merck_pptx.build_from_plan import build_from_plan
+        from merck_pptx.build_from_plan import build_from_plan, TemplateNotFoundError
         from merck_pptx.validate_plan import ValidationError
         try:
             out = build_from_plan(args.plan, args.output)
@@ -185,9 +286,13 @@ def main():
         except ValidationError as e:
             print(f"Validation error: {e}", file=sys.stderr)
             sys.exit(2)
+        except TemplateNotFoundError as e:
+            print(f"Template error: {e}", file=sys.stderr)
+            sys.exit(5)
 
     elif args.command == "generate":
         from merck_pptx.generate import generate_deck
+        from merck_pptx.build_from_plan import TemplateNotFoundError
         from merck_pptx.validate_plan import ValidationError
 
         if args.meta:
@@ -214,6 +319,9 @@ def main():
         except ValidationError as e:
             print(f"Validation error: {e}", file=sys.stderr)
             sys.exit(2)
+        except TemplateNotFoundError as e:
+            print(f"Template error: {e}", file=sys.stderr)
+            sys.exit(5)
         except EnvironmentError as e:
             print(f"Configuration error: {e}", file=sys.stderr)
             sys.exit(3)
@@ -224,6 +332,9 @@ def main():
     elif args.command == "discover-templates":
         from merck_pptx.binary_templates import cmd_discover
         cmd_discover()
+
+    elif args.command == "list-templates":
+        _cmd_list_templates()
 
     elif args.command == "register-template":
         from merck_pptx.binary_templates import cmd_register

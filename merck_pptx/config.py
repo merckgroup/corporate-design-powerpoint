@@ -63,7 +63,12 @@ _DEFAULTS: Dict[str, Any] = {
         "enabled":       True,
         "binary_dir":    os.path.join(_default_empower_root(), "BinaryFiles"),
         "thumbnail_dir": os.path.join(_default_empower_root(), "ThumbnailLarge"),
-    }
+    },
+    "manual_templates": {
+        # Path to the user-managed manual template folder.
+        # Empty string → resolved to ~/.merck_pptx/templates/ at runtime.
+        "dir": "",
+    },
 }
 
 
@@ -157,6 +162,16 @@ def empower_binary_dir() -> str:
 def empower_thumbnail_dir() -> str:
     """Return the empower ThumbnailLarge directory path."""
     return get("empower", "thumbnail_dir", _DEFAULTS["empower"]["thumbnail_dir"])
+
+
+def manual_templates_dir() -> str:
+    """Return the user-managed manual templates directory path.
+
+    Empty string in config means 'use the default' (~/.merck_pptx/templates/).
+    The actual Path resolution lives in manual_templates.py to avoid a circular
+    import; this accessor just surfaces the raw config value for inspection.
+    """
+    return get("manual_templates", "dir", "")
 
 
 def empower_enabled() -> bool:

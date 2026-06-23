@@ -103,11 +103,18 @@ def _resolve_template(region: str, color_theme: str,
     """Return the best-matching base template for (region, color_theme, division).
 
     Lookup order:
-    0. empower BinaryFile registry — exact per-theme PPTX (EU/global only; USA
-       keeps its own legal-compliance template).  Requires empower to be installed.
-    1. (region, division) from _DIVISION_TEMPLATES (if file exists on disk)
-    2. (region, "merck")  — region default
-    3. global default     — EU_Merck_Themed.pptx
+    0.  empower BinaryFile registry — exact per-theme PPTX with correct baked-in
+        layout shapes.  Requires empower to be installed (Windows).
+    0.5 User-managed manual templates — ~/.merck_pptx/templates/{division}_{theme}.pptx
+        For Mac/Linux users and selective Windows installs.  Run setup to see
+        how to populate this folder.
+    1.  (region, division) static template in merck_pptx/templates/ (rare)
+    2.  (region, "merck") region default — ONLY when division == "merck"
+    3.  Global fallback EU_Merck_Themed.pptx — ONLY when division == "merck"
+
+    For any division other than "merck", if steps 0–1 all miss, a
+    TemplateNotFoundError is raised with instructions for all three fix paths.
+    This prevents silently producing slides with the wrong logo/branding.
     """
     r = str(region   or "eu").lower().strip()
     d = str(division or "merck").lower().strip().replace("-", "_").replace(" ", "_")
@@ -117,8 +124,8 @@ def _resolve_template(region: str, color_theme: str,
     # 0. BinaryFile template — correct per-theme layout/design shapes baked in.
     #    Exact match only: do NOT fall back to a "merck" BinaryFile for a
     #    non-merck division — that would silently embed the wrong logo/branding.
-    #    All regions (EU, USA, Asia, etc.) use BinaryFiles when registered;
-    #    static templates/ files serve as fallback for unregistered combinations.
+    #    Works on Windows (empower installed); uid_to_path() returns None on Mac
+    #    (BinaryFiles dir absent), in which case the code falls through correctly.
     try:
         from .binary_templates import load_registry, uid_to_path
         uid = (load_registry().get(d) or {}).get(color_theme)
@@ -129,22 +136,46 @@ def _resolve_template(region: str, color_theme: str,
     except Exception:
         pass
 
-    # 1. Division-specific template.
+    # 0.5. Manual template — user-placed file in ~/.merck_pptx/templates/.
+    #      Primary path for Mac/Linux users and anyone who doesn't have empower.
+    #      Returns None silently if the directory or file is absent.
+    try:
+        from .manual_templates import resolve_manual_template
+        mp = resolve_manual_template(d, color_theme)
+        if mp is not None:
+            return mp
+    except Exception:
+        pass
+
+    # 1. Division-specific static template bundled in merck_pptx/templates/.
     fname = _DIVISION_TEMPLATES.get((r, d))
     if fname:
         candidate = _TEMPLATE_DIR / fname
         if candidate.exists():
             return candidate
 
-    # 2. Region Merck default.
+    # 2 & 3. Region and global defaults — available ONLY for the "merck" division.
+    #
+    # For any other division (emd_serono, millipore_sigma, merck_asia, etc.)
+    # falling through silently to the generic merck template would produce slides
+    # with the wrong logo and branding.  Raise an informative error instead.
+    if d != "merck":
+        raise TemplateNotFoundError(r, d, color_theme)
+
     merck_default = _DIVISION_TEMPLATES.get((r, "merck"))
     if merck_default:
         candidate = _TEMPLATE_DIR / merck_default
         if candidate.exists():
             return candidate
 
-    # 3. Global fallback.
-    return _TEMPLATE_DEFAULT
+    # Global fallback for merck division (EU_Merck_Themed.pptx is always bundled).
+    if _TEMPLATE_DEFAULT.exists():
+        return _TEMPLATE_DEFAULT
+
+    raise FileNotFoundError(
+        f"Bundled fallback template not found: {_TEMPLATE_DEFAULT}\n"
+        "The merck_pptx package may be incomplete — try reinstalling."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -376,6 +407,50 @@ def _apply_color_theme(prs, color_theme: str,
 _SAFE_IMAGE_EXTENSIONS = frozenset({
     ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".tif", ".webp", ".emf", ".wmf",
 })
+
+
+class TemplateNotFoundError(ValueError):
+    """Raised when the requested (division, color_theme) template is not available.
+
+    Provides actionable instructions for all three fix paths:
+      A — install empower (Windows)
+      B — manual download into ~/.merck_pptx/templates/
+      C — switch to division='merck' (always bundled)
+    """
+
+    def __init__(self, region: str, division: str, color_theme: str):
+        # Resolve the actual configured manual templates directory so the error
+        # message points to the right place even when manual_templates.dir is
+        # set to a custom path in config.yaml.
+        try:
+            from .manual_templates import manual_templates_dir as _mtd
+            manual_dir = _mtd()
+        except Exception:
+            manual_dir = pathlib.Path.home() / ".merck_pptx" / "templates"
+        filename = f"{division}_{color_theme}.pptx"
+        super().__init__(
+            f"\nTemplate not available: division='{division}', "
+            f"color_theme='{color_theme}', region='{region}'\n\n"
+            "This template combination is not installed on your machine.\n\n"
+            "How to fix:\n\n"
+            "  Option A (Windows with empower):\n"
+            "    Install the empower PowerPoint add-in, then run:\n"
+            "        python setup_merck_pptx.py\n"
+            "    empower automatically syncs all Merck Corporate Design templates.\n\n"
+            "  Option B (Mac, Linux, or selective install -- no empower):\n"
+            "    1. Ask a Windows colleague to open PowerPoint with empower.\n"
+            "    2. Go to: empower tab -> Corporate Design Templates -> Master Templates\n"
+            "    3. Right-click the template -> Export to file -> save as .pptx\n"
+            f"    4. Place the file at:  {manual_dir / filename}\n"
+            "    5. Verify it is recognised:\n"
+            "         python -m merck_pptx list-templates\n\n"
+            "  Option C (generic Merck branding only -- not division-specific):\n"
+            f"    Set meta.division = 'merck' in your plan to use the bundled\n"
+            f"    EU/USA Merck template. Note: this uses the Merck KGaA logo,\n"
+            f"    not the '{division}' logo. Only use this if generic branding is\n"
+            f"    acceptable for your presentation.\n\n"
+            "Run 'python -m merck_pptx list-templates' to see all available templates."
+        )
 
 
 class BuildError(RuntimeError):
@@ -1768,11 +1843,22 @@ def build_from_plan(plan, output_path, base_pptx: Optional[str] = None,
     # per-theme hardcoded fills — skip step 2 (fill patching) to avoid
     # overwriting those correct values (e.g. B4DC96 → A5CD50 for plastic
     # would make the light panel invisible on the lime-green background).
+    #
+    # Manual templates (~/.merck_pptx/templates/) are intended to be empower
+    # BinaryFile exports and carry the same correct baked-in fills.  Verify this
+    # with a fast layout-count check before skipping patch_hardcoded_fills — a
+    # user could accidentally place any renamed PPTX there, and applying
+    # patch_hardcoded_fills=False to a non-empower file would leave pale-green
+    # #B4DC96 fills un-patched on organic/technical themes.
     try:
         from .binary_templates import _binary_dir as _bt_binary_dir
+        from .manual_templates import manual_templates_dir as _mt_dir, is_empower_template as _is_emp
+        _resolved = pathlib.Path(template_path).resolve()
+        _from_empower_dir = _resolved.parent == pathlib.Path(_bt_binary_dir()).resolve()
+        _from_manual_dir  = _resolved.parent == pathlib.Path(_mt_dir()).resolve()
         _is_binary_template = (
-            pathlib.Path(template_path).resolve().parent
-            == pathlib.Path(_bt_binary_dir()).resolve()
+            _from_empower_dir
+            or (_from_manual_dir and _is_emp(_resolved))
         )
     except Exception:
         _is_binary_template = False

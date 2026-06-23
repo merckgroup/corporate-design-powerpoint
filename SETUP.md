@@ -50,8 +50,18 @@ Expected output:
 
 ```
 OK
-usage: python -m merck_pptx [-h] {generate,build,discover-templates,register-template} ...
+usage: python -m merck_pptx [-h] {generate,build,discover-templates,list-templates,register-template} ...
 ```
+
+### 5. (Optional) Run the setup script
+
+Run `setup_merck_pptx.py` to auto-detect the empower add-in, scan all available templates, and print instructions for adding templates manually:
+
+```bash
+python setup_merck_pptx.py
+```
+
+This is not required if you only use `build` with `division: merck` (the bundled templates always work). It is recommended for Mac/Linux users and anyone who needs non-`merck` division templates.
 
 ---
 
@@ -197,11 +207,16 @@ pip install -r requirements.txt --upgrade
 
 The pipeline resolves templates in this priority order:
 
-1. **empower BinaryFiles** (primary) — exact per-theme PPTX files from the empower library, registered in `merck_pptx/binary_registry.json`. These carry correct per-theme design shapes baked into the layouts.
-2. **Division static templates** — `.pptx` files placed in `merck_pptx/templates/`, one per division/region combination.
-3. **Region default** — `EU_Merck_Themed.pptx` (EU) or `USA_Merck_Themed_Base_v1.pptx` (USA), both included with the package.
+1. **empower BinaryFiles** (primary, Windows only) — exact per-theme PPTX files with correct design shapes baked in. Requires the empower add-in to be installed.
+2. **Manual templates** (`~/.merck_pptx/templates/`) — user-placed files for Mac/Linux users or selective Windows installs. See [Manual templates](#manual-templates-macos--linux-and-selective-download) below.
+3. **Division static templates** (`merck_pptx/templates/`) — `.pptx` files committed to the repository, one per division/region. Only `merck` division files are bundled.
+4. **Region default** (bundled) — `EU_Merck_Themed.pptx` (EU) or `USA_Merck_Themed_Base_v1.pptx` (USA). **Available only for `division: merck`.**
 
-### Registering empower BinaryFile templates (recommended)
+> **Important:** For divisions other than `merck` (e.g. `emd_serono`, `millipore_sigma`), the pipeline raises a `TemplateNotFoundError` if no template is found in steps 1–2. It does **not** silently fall back to the generic Merck template, because that would produce slides with the wrong logo and branding.
+>
+> Run `python -m merck_pptx list-templates` at any time to see what is available on your machine.
+
+### empower BinaryFile templates (Windows, recommended)
 
 If your organisation uses empower and you have BinaryFiles installed, register them for exact per-theme rendering:
 
@@ -216,26 +231,75 @@ python -m merck_pptx register-template <uid> emd_serono organic
 
 `<uid>` is the BinaryFile identifier shown by `discover-templates` (the filename without `.pptx`). Registration is stored in `merck_pptx/binary_registry.json`.
 
-### Adding a static division template (fallback)
+### Manual templates (macOS / Linux and selective download)
 
-Use this only if empower BinaryFiles are not available for your division.
+Mac and Linux users (and Windows users without empower) can download individual template files and place them in a local folder. The pipeline checks this folder automatically.
 
-1. In empower, go to **Corporate Design Templates → Master Templates → {Division}** and export the master template as a `.pptx` file.
-2. Name it according to the table below and place it in `merck_pptx/templates/`.
+**Directory:** `~/.merck_pptx/templates/`
 
-| `division` | EU template file | USA template file |
-|---|---|---|
-| `merck` *(default)* | `EU_Merck_Themed.pptx` ✅ included | `USA_Merck_Themed_Base_v1.pptx` ✅ included |
-| `emd_electronics` | `EU_EMDElectronics_Themed.pptx` | `USA_EMDElectronics_Themed.pptx` |
-| `emd_serono` | `EU_EMDSerono_Themed.pptx` | `USA_EMDSerono_Themed.pptx` |
-| `millipore_sigma` | `EU_MilliporeSigma_Themed.pptx` | `USA_MilliporeSigma_Themed.pptx` |
-| `merck_asia` | `EU_MerckAsia_Themed.pptx` | `USA_MerckAsia_Themed.pptx` |
+**Naming convention:** `{division}_{color_theme}.pptx`
 
-If a division-specific file is missing the pipeline falls back to the region default — no error is raised.
+| Examples | |
+|---|---|
+| `merck_organic.pptx` | Generic Merck, organic (cream/red) theme |
+| `merck_plastic.pptx` | Generic Merck, plastic (green/pink) theme |
+| `emd_serono_organic.pptx` | EMD Serono, organic theme |
+| `millipore_sigma_functional.pptx` | MilliporeSigma, functional (green/teal) theme |
+
+**Valid division keys:**
+
+| Key | Brand |
+|---|---|
+| `merck` | Merck KGaA (EU/global) — *bundled, always available* |
+| `merck_asia` | Merck 默克 (Asia/China branding) |
+| `emd_serono` | EMD Serono (USA/Canada Healthcare) |
+| `millipore_sigma` | MilliporeSigma (USA/Canada Life Science) |
+| `emd_electronics` | EMD Electronics (USA/Canada) |
+| `usa` | USA tri-brand (cross-business) |
+
+**Valid color_theme keys:** `plastic`  `functional`  `organic`  `synthetic`  `technical`  `electronics`
+
+**How to get the template files:**
+
+1. Ask a Windows colleague who has empower installed to open PowerPoint.
+2. Go to: **empower tab → Corporate Design Templates → Master Templates → Merck** (or the relevant division).
+3. Right-click the desired template → **Export to file** → save as `.pptx`.
+4. Rename the file to `{division}_{color_theme}.pptx` and place it in `~/.merck_pptx/templates/`.
+5. Verify it is recognised:
+   ```bash
+   python -m merck_pptx list-templates
+   ```
+
+> **You do not need to download all templates** — only the ones you will actually use. `division: merck` always works without any download.
+
+### Custom manual templates directory
+
+To use a different folder, set `manual_templates.dir` in your `config.yaml`:
+
+```yaml
+manual_templates:
+  dir: "/path/to/my/templates"
+```
+
+### Registering additional empower BinaryFile templates
+
+If `discover-templates` shows UIDs that are not yet registered:
+
+```bash
+python -m merck_pptx discover-templates      # shows registered vs. unregistered
+python -m merck_pptx register-template <uid> <division> <color_theme>
+```
 
 ---
 
 ## Troubleshooting
+
+**`TemplateNotFoundError: Template not available: division='X', color_theme='Y', region='Z'`**
+The pipeline found no template for the requested division + color theme combination. Fix options:
+- **Windows:** Install the empower add-in, then re-run `python setup_merck_pptx.py`.
+- **Mac/Linux (or no empower):** Download the template file from a Windows machine (see [Manual templates](#manual-templates-macos--linux-and-selective-download)) and place it at `~/.merck_pptx/templates/{division}_{color_theme}.pptx`.
+- **Quick fix:** Change `meta.division` to `merck` in your plan — the bundled EU/USA Merck template is always available for all 6 color themes.
+- Run `python -m merck_pptx list-templates` to see what is currently available on your machine.
 
 **`ModuleNotFoundError: No module named 'merck_pptx'`**
 Run all commands from the repository root directory (the folder that contains `merck_pptx/`). The package is not globally installed — Python must be able to find it on the path.
