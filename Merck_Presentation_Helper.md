@@ -45,11 +45,10 @@ Set `meta.division` to select the correct logo and branding for your business un
 
 | Division key | Branding |
 |---|---|
-| `merck` *(default)* | Merck KGaA — cross-divisional |
-| `merck_healthcare` | Merck Healthcare |
-| `merck_life_science` | Merck Life Science |
-| `merck_electronics` | Merck Electronics |
+| `merck` *(default)* | Merck KGaA |
 | `merck_asia` | Merck — Asia/China |
+
+> EU business units (Healthcare, Life Science, Electronics) all use the standard Merck KGaA template — use `color_theme` to signal the business unit (`organic` for Healthcare, `functional` for Life Science, `electronics` for Electronics).
 
 **USA (`region: "USA"`):**
 

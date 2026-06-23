@@ -80,19 +80,7 @@ When you run `generate` without `--defaults`, the tool asks five questions. Here
 
 Never use an EU deck for a USA audience and vice versa.
 
-The tool immediately asks which division, for both regions:
-
-**EU divisions:**
-
-| # | Division key | Branding |
-|---|---|---|
-| 1 | `merck` | Merck KGaA — cross-divisional *(default)* |
-| 2 | `merck_healthcare` | Merck Healthcare |
-| 3 | `merck_life_science` | Merck Life Science |
-| 4 | `merck_electronics` | Merck Electronics |
-| 5 | `merck_asia` | Merck — Asia/China |
-
-**USA divisions:**
+For **USA**, the tool immediately asks which division:
 
 | # | Division key | Branding |
 |---|---|---|
@@ -101,7 +89,9 @@ The tool immediately asks which division, for both regions:
 | 3 | `emd_electronics` | EMD Electronics |
 | 4 | `usa` | US tri-brand — cross-business North America |
 
-On Windows with empower installed, all divisions are available automatically. See [SETUP.md](SETUP.md) if you need to add template files manually.
+For **EU**, division defaults to `merck` (Merck KGaA). If you need Asia/China branding (`merck_asia`), pass it via `--meta` (see below).
+
+> **Note on EU business units:** Merck Healthcare, Merck Life Science, and Merck Electronics do not have separate empower templates — all EU business units share the standard Merck KGaA template set, differentiated by `color_theme` only (e.g. `organic` for Healthcare, `functional` for Life Science, `electronics` for Electronics).
 
 ### 2. Audience
 

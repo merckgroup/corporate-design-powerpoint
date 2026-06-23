@@ -35,24 +35,16 @@ def _ask_meta() -> dict:
             ("emd_electronics", "EMD Electronics"),
             ("usa",             "US tri-brand (cross-business)"),
         ]
-        _div_default = "emd_serono"
+        print("    Division:")
+        for i, (key, label) in enumerate(_divisions, 1):
+            print(f"      {i}. {label}")
+        div_choice = input("      Choice [1]: ").strip() or "1"
+        try:
+            division = _divisions[int(div_choice) - 1][0]
+        except (ValueError, IndexError):
+            division = "emd_serono"
     else:
-        _divisions = [
-            ("merck",              "Merck KGaA (cross-divisional)"),
-            ("merck_healthcare",   "Merck Healthcare"),
-            ("merck_life_science", "Merck Life Science"),
-            ("merck_electronics",  "Merck Electronics"),
-            ("merck_asia",         "Merck — Asia/China"),
-        ]
-        _div_default = "merck"
-    print("    Division:")
-    for i, (key, label) in enumerate(_divisions, 1):
-        print(f"      {i}. {label}")
-    div_choice = input("      Choice [1]: ").strip() or "1"
-    try:
-        division = _divisions[int(div_choice) - 1][0]
-    except (ValueError, IndexError):
-        division = _div_default
+        division = "merck"
 
     classification = input("[2/6] Classification (Public / Internal / Confidential) [Internal]: ").strip() or "Internal"
     if classification.lower() == "secret":
