@@ -86,10 +86,11 @@ The tool immediately asks which division, for both regions:
 
 | # | Division key | Branding |
 |---|---|---|
-| 1 | `merck` | Merck KGaA — Healthcare *(default)* |
-| 2 | `merck_life_science` | Merck Life Science |
-| 3 | `merck_electronics` | Merck Electronics |
-| 4 | `merck_asia` | Merck — Asia/China |
+| 1 | `merck` | Merck KGaA — cross-divisional *(default)* |
+| 2 | `merck_healthcare` | Merck Healthcare |
+| 3 | `merck_life_science` | Merck Life Science |
+| 4 | `merck_electronics` | Merck Electronics |
+| 5 | `merck_asia` | Merck — Asia/China |
 
 **USA divisions:**
 

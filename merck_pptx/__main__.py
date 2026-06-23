@@ -38,7 +38,8 @@ def _ask_meta() -> dict:
         _div_default = "emd_serono"
     else:
         _divisions = [
-            ("merck",              "Merck KGaA — Healthcare"),
+            ("merck",              "Merck KGaA (cross-divisional)"),
+            ("merck_healthcare",   "Merck Healthcare"),
             ("merck_life_science", "Merck Life Science"),
             ("merck_electronics",  "Merck Electronics"),
             ("merck_asia",         "Merck — Asia/China"),

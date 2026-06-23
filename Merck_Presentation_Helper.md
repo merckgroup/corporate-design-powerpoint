@@ -45,7 +45,8 @@ Set `meta.division` to select the correct logo and branding for your business un
 
 | Division key | Branding |
 |---|---|
-| `merck` *(default)* | Merck KGaA — Healthcare |
+| `merck` *(default)* | Merck KGaA — cross-divisional |
+| `merck_healthcare` | Merck Healthcare |
 | `merck_life_science` | Merck Life Science |
 | `merck_electronics` | Merck Electronics |
 | `merck_asia` | Merck — Asia/China |

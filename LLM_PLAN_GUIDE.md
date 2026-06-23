@@ -70,7 +70,8 @@ Selects the divisional logo and template. Must match `region`.
 **EU divisions (`region: "EU"`):**
 | Value | Division |
 |---|---|
-| `"merck"` | Merck KGaA — Healthcare *(default)* |
+| `"merck"` | Merck KGaA — cross-divisional *(default)* |
+| `"merck_healthcare"` | Merck Healthcare |
 | `"merck_life_science"` | Merck Life Science |
 | `"merck_electronics"` | Merck Electronics |
 | `"merck_asia"` | Merck — Asia/China |
