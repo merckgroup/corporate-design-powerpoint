@@ -65,14 +65,23 @@ has multiple sections; omit for single-topic decks.
 **NEVER use EU template for USA audiences and vice versa.**
 
 ### `division` (optional, default: `"merck"`)
-Selects the divisional template. Omit unless the deck targets a specific Merck division.
+Selects the divisional logo and template. Must match `region`.
+
+**EU divisions (`region: "EU"`):**
 | Value | Division |
 |---|---|
-| `"merck"` | Merck Healthcare (default) |
-| `"emd_serono"` | EMD Serono |
+| `"merck"` | Merck KGaA — Healthcare *(default)* |
+| `"merck_life_science"` | Merck Life Science |
+| `"merck_electronics"` | Merck Electronics |
+| `"merck_asia"` | Merck — Asia/China |
+
+**USA divisions (`region: "USA"`):**
+| Value | Division |
+|---|---|
+| `"emd_serono"` | EMD Serono — Healthcare |
+| `"millipore_sigma"` | MilliporeSigma — Life Science |
 | `"emd_electronics"` | EMD Electronics |
-| `"millipore_sigma"` | MilliporeSigma |
-| `"merck_asia"` | Merck Asia |
+| `"usa"` | US tri-brand (cross-business) |
 
 ---
 

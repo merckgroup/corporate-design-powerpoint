@@ -71,7 +71,7 @@ This is useful when you want to adjust layout choices, reorder slides, or fine-t
 
 When you run `generate` without `--defaults`, the tool asks five questions. Here is what each choice actually does to your deck.
 
-### 1. Region
+### 1. Region and division
 
 `EU` or `USA`. This is a **compliance requirement**, not just a visual option.
 
@@ -79,6 +79,28 @@ When you run `generate` without `--defaults`, the tool asks five questions. Here
 - **USA** — carries the EMD/MilliporeSigma legal disclaimer. For North America only.
 
 Never use an EU deck for a USA audience and vice versa.
+
+The tool immediately asks which division, for both regions:
+
+**EU divisions:**
+
+| # | Division key | Branding |
+|---|---|---|
+| 1 | `merck` | Merck KGaA — Healthcare *(default)* |
+| 2 | `merck_life_science` | Merck Life Science |
+| 3 | `merck_electronics` | Merck Electronics |
+| 4 | `merck_asia` | Merck — Asia/China |
+
+**USA divisions:**
+
+| # | Division key | Branding |
+|---|---|---|
+| 1 | `emd_serono` | EMD Serono — Healthcare *(default)* |
+| 2 | `millipore_sigma` | MilliporeSigma — Life Science |
+| 3 | `emd_electronics` | EMD Electronics |
+| 4 | `usa` | US tri-brand — cross-business North America |
+
+On Windows with empower installed, all divisions are available automatically. See [SETUP.md](SETUP.md) if you need to add template files manually.
 
 ### 2. Audience
 
@@ -140,6 +162,63 @@ There is a sixth parameter, `variety_mode`, but for most decks you do not need t
 `default` gives Claude 30 layouts — the standard set for business, science, and project presentations. `creative` adds 16 more visually distinctive layouts: word cloud, fishbone (cause-and-effect), pyramid, layered stack, photo panels. Use `creative` only if you are making a communications or research presentation and specifically want those styles.
 
 > The reason this parameter exists: with 46 options available, Claude occasionally reaches for an unusual layout (a word cloud where a two-column would be better). `default` keeps choices conservative and predictable. Your audience and deck style already guide layout density and formality — variety mode is simply a guardrail on the full layout toolkit.
+
+---
+
+## Setting color theme and other parameters via `--meta`
+
+The interactive flow covers the most common settings. One parameter it does **not** ask for is `color_theme` (and for EU, `division` when you need Asia/China branding). To set these, pass a `--meta` JSON file.
+
+### Full `--meta` reference
+
+Create a JSON file with any combination of the fields below and pass it with `--meta`. Fields you omit fall back to sensible defaults.
+
+```json
+{
+  "region":          "EU",
+  "division":        "merck",
+  "classification":  "Internal",
+  "month_year":      "June 2026",
+  "audience":        "Senior management",
+  "deck_style":      "merck_corporate",
+  "color_theme":     "organic",
+  "variety_mode":    "default",
+  "deck_label":      "Q2 Business Review",
+  "show_disclaimer": false
+}
+```
+
+Use this with any input type:
+
+```bash
+# From a markdown brief
+python -m merck_pptx generate brief.md output/deck.pptx --meta meta.json
+
+# From an existing PowerPoint
+python -m merck_pptx generate old_deck.pptx output/deck.pptx --meta meta.json
+
+# Save the generated plan so you can inspect or tweak it before building
+python -m merck_pptx generate brief.md output/deck.pptx --meta meta.json --save-plan plan.json
+python -m merck_pptx build plan.json output/deck_revised.pptx
+```
+
+**EMD Serono example:**
+
+```json
+{
+  "region":         "USA",
+  "division":       "emd_serono",
+  "color_theme":    "organic",
+  "classification": "Internal",
+  "audience":       "Senior management",
+  "deck_style":     "merck_corporate",
+  "deck_label":     "EMD Serono Q2 Review"
+}
+```
+
+```bash
+python -m merck_pptx generate brief.md output/deck.pptx --meta emd_serono_meta.json
+```
 
 ---
 

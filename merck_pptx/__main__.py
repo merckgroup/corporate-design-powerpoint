@@ -28,6 +28,31 @@ def _ask_meta() -> dict:
         region = "EU"
     region = region.upper()
 
+    if region == "USA":
+        _divisions = [
+            ("emd_serono",      "EMD Serono — Healthcare"),
+            ("millipore_sigma", "MilliporeSigma — Life Science"),
+            ("emd_electronics", "EMD Electronics"),
+            ("usa",             "US tri-brand (cross-business)"),
+        ]
+        _div_default = "emd_serono"
+    else:
+        _divisions = [
+            ("merck",              "Merck KGaA — Healthcare"),
+            ("merck_life_science", "Merck Life Science"),
+            ("merck_electronics",  "Merck Electronics"),
+            ("merck_asia",         "Merck — Asia/China"),
+        ]
+        _div_default = "merck"
+    print("    Division:")
+    for i, (key, label) in enumerate(_divisions, 1):
+        print(f"      {i}. {label}")
+    div_choice = input("      Choice [1]: ").strip() or "1"
+    try:
+        division = _divisions[int(div_choice) - 1][0]
+    except (ValueError, IndexError):
+        division = _div_default
+
     classification = input("[2/6] Classification (Public / Internal / Confidential) [Internal]: ").strip() or "Internal"
     if classification.lower() == "secret":
         print("ERROR: Secret-classified decks cannot be generated. Exiting.")
@@ -79,13 +104,14 @@ def _ask_meta() -> dict:
     deck_label = input("\nDeck label / title (appears in footer) [Merck Presentation]: ").strip() or "Merck Presentation"
 
     return {
-        "region":         region,
-        "deck_label":     deck_label,
-        "classification": classification,
-        "month_year":     month_year,
-        "audience":       audience,
-        "deck_style":     deck_style,
-        "variety_mode":   variety,
+        "region":          region,
+        "division":        division,
+        "deck_label":      deck_label,
+        "classification":  classification,
+        "month_year":      month_year,
+        "audience":        audience,
+        "deck_style":      deck_style,
+        "variety_mode":    variety,
         "show_disclaimer": False,
     }
 

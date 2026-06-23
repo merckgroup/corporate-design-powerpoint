@@ -28,7 +28,7 @@ python -m merck_pptx generate source.md output/deck.pptx
 
 ---
 
-## 1. Choosing Your Region
+## 1. Choosing Your Region and Division
 
 Set `meta.region` to match your audience — this controls the legal disclaimer and template file.
 
@@ -38,6 +38,26 @@ Set `meta.region` to match your audience — this controls the legal disclaimer 
 | USA and Canada | `"USA"` | USA_Merck_Themed_Base_v1.pptx | EMD/MilliporeSigma disclaimer |
 
 **Rule:** Never use an EU template for a USA audience and vice versa.
+
+Set `meta.division` to select the correct logo and branding for your business unit.
+
+**EU (`region: "EU"`):**
+
+| Division key | Branding |
+|---|---|
+| `merck` *(default)* | Merck KGaA — Healthcare |
+| `merck_life_science` | Merck Life Science |
+| `merck_electronics` | Merck Electronics |
+| `merck_asia` | Merck — Asia/China |
+
+**USA (`region: "USA"`):**
+
+| Division key | Branding |
+|---|---|
+| `emd_serono` | EMD Serono — Healthcare |
+| `millipore_sigma` | MilliporeSigma — Life Science |
+| `emd_electronics` | EMD Electronics |
+| `usa` | US tri-brand (cross-business) |
 
 ---
 
