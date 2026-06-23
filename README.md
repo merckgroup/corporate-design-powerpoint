@@ -31,7 +31,7 @@ Once set up, the fastest way to generate a deck:
 python -m merck_pptx generate brief.md output/deck.pptx --defaults
 ```
 
-This uses sensible defaults (EU region, Internal classification, Executive leadership audience, `merck_executive` style) and asks no questions. Drop `--defaults` to answer the six questions interactively instead.
+This uses sensible defaults (EU region, Internal classification, Mixed audience, `merck_corporate` style, `organic` color theme) and asks no questions. Drop `--defaults` to answer the six questions interactively instead.
 
 ---
 
