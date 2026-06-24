@@ -43,10 +43,10 @@ This schema is the source of truth. The agent does not generate slides outside t
 | audience | yes | Executive leadership / Senior management / Functional team / Mixed audience / External |
 | deck_style | yes | merck_executive / merck_corporate / merck_storytelling / merck_science |
 | show_disclaimer | yes | Boolean; only true for external-facing |
-| topic | yes | Short noun phrase for the deck topic |
-| deck_objective | yes | One sentence; what the deck is for |
-| single_sentence_takeaway | yes | The whole deck argument in one line |
-| final_ask | yes | The decision or action requested |
+| topic | optional | Short noun phrase for the deck topic (3-6 words, no verb). LLM derives if absent. |
+| deck_objective | optional | One sentence; what this deck is FOR and FOR WHOM. LLM derives if absent. |
+| single_sentence_takeaway | optional | The whole deck argument in one line. LLM derives if absent. |
+| final_ask | optional | The decision or action requested; null for informational decks. LLM derives if absent. |
 | light_footer | optional | Boolean; suppresses dark purple footer band |
 | cover_top_bar | optional | Boolean; full-width MERCK_GOLD bar at very top of cover — only applies to the programmatic fallback cover (no themed template found); has no effect on native template covers |
 | region | yes | `"EU"` (uses `Merck_Themed_Merck.pptx`) or `"USA"` (uses `Merck_Themed_Base_v1.pptx`). Default: `"EU"`. Controls template and brand identity. |

@@ -1,4 +1,5 @@
 import re
+import zipfile
 
 
 def _title_text(value: object) -> str:
@@ -285,3 +286,103 @@ def validate_plan(plan: dict) -> list:
             )
 
     return warnings
+
+
+# ---------------------------------------------------------------------------
+# Post-build PPTX structural integrity check
+# ---------------------------------------------------------------------------
+
+_NS_CT = "http://schemas.openxmlformats.org/package/2006/content-types"
+_NS_P  = "http://schemas.openxmlformats.org/presentationml/2006/main"
+_NS_A  = "http://schemas.openxmlformats.org/drawingml/2006/main"
+_INT_RE = re.compile(r"^-?\d+$")
+
+
+def validate_pptx(path: str) -> tuple:
+    """Scan a built .pptx for structural issues that trigger PowerPoint's
+    'needs repair' dialog. Returns (errors, warnings).
+
+    Catches:
+      - non-integer cx/cy/x/y EMU attribute values (xsd:long violation)
+      - duplicate cNvPr shape IDs within a single slide
+      - [Content_Types].xml Override entries pointing at missing zip members
+      - empty <a:r> runs with no <a:t> child (soft warning)
+
+    Empty errors list means the file should open cleanly in PowerPoint.
+    """
+    try:
+        from lxml import etree as _ET
+    except ImportError:
+        from xml.etree import ElementTree as _ET  # type: ignore[no-redef]
+
+    errors: list = []
+    warnings: list = []
+
+    try:
+        zf = zipfile.ZipFile(path)
+    except (zipfile.BadZipFile, FileNotFoundError, OSError) as exc:
+        return ([f"could not open {path}: {exc}"], [])
+
+    with zf as z:
+        names = z.namelist()
+        archive_set = {"/" + n for n in names}
+
+        # 1. Content_Types — every Override PartName must resolve inside the zip.
+        try:
+            ct_root = _ET.fromstring(z.read("[Content_Types].xml"))
+            for ov in ct_root.findall("{%s}Override" % _NS_CT):
+                part = ov.get("PartName")
+                if part and part not in archive_set:
+                    errors.append(
+                        f"[Content_Types].xml references missing file: {part}"
+                    )
+        except Exception as exc:
+            errors.append(f"could not parse [Content_Types].xml: {exc}")
+
+        # 2. Per-slide checks.
+        slide_files = sorted(
+            [n for n in names
+             if n.startswith("ppt/slides/slide") and n.endswith(".xml")],
+            key=lambda s: int(s.split("slide")[-1].split(".")[0]),
+        )
+        for sp in slide_files:
+            slide_n = int(sp.split("slide")[-1].split(".")[0])
+            try:
+                tree = _ET.fromstring(z.read(sp))
+            except Exception as exc:
+                errors.append(f"slide {slide_n}: invalid XML — {exc}")
+                continue
+
+            # 2a. Non-integer EMU coordinate values (gantt float-EMU bug etc.).
+            for el in tree.iter():
+                for attr in ("cx", "cy", "x", "y"):
+                    val = el.get(attr)
+                    if val is not None and not _INT_RE.match(val):
+                        tag = el.tag.split("}")[-1] if "}" in el.tag else el.tag
+                        errors.append(
+                            f"slide {slide_n}: <{tag} {attr}={val!r}> "
+                            f"is not an integer EMU (triggers PowerPoint repair warning)"
+                        )
+
+            # 2b. Duplicate cNvPr shape IDs within the slide.
+            ids: list = []
+            for cnv in tree.iter("{%s}cNvPr" % _NS_P):
+                sid = cnv.get("id")
+                if sid:
+                    ids.append(sid)
+            from collections import Counter as _Counter
+            dupes = sorted(sid for sid, cnt in _Counter(ids).items() if cnt > 1)
+            if dupes:
+                errors.append(f"slide {slide_n}: duplicate shape IDs {dupes}")
+
+            # 2c. Empty <a:r> runs — render as invisible whitespace (warning only).
+            empty_runs = sum(
+                1 for r in tree.iter("{%s}r" % _NS_A)
+                if r.find("{%s}t" % _NS_A) is None
+            )
+            if empty_runs:
+                warnings.append(
+                    f"slide {slide_n}: {empty_runs} <a:r> element(s) with no <a:t> text"
+                )
+
+    return (errors, warnings)

@@ -1913,4 +1913,20 @@ def build_from_plan(plan, output_path, base_pptx: Optional[str] = None,
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     save_deck(prs, str(output_path))
+
+    # Post-build OOXML integrity check — catches issues that trigger the
+    # PowerPoint "needs repair" dialog (float EMU values, duplicate shape IDs, etc.).
+    from .validate_plan import validate_pptx as _validate_pptx
+    _pptx_errs, _pptx_warns = _validate_pptx(str(output_path))
+    for _w in _pptx_warns:
+        print(f"PPTX warning: {_w}", file=sys.stderr)
+    if _pptx_errs:
+        for _e in _pptx_errs:
+            print(f"PPTX structural issue: {_e}", file=sys.stderr)
+        print(
+            "WARNING: the built deck may show a 'needs repair' dialog in PowerPoint. "
+            "Report this as a bug in merck_layouts.py.",
+            file=sys.stderr,
+        )
+
     return str(output_path.resolve())

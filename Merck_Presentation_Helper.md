@@ -28,6 +28,38 @@ python -m merck_pptx generate source.md output/deck.pptx
 
 ---
 
+## 0. Narrative Context — sharpen Claude's plan before it starts
+
+When you run the pipeline interactively (`python -m merck_pptx generate`), the last two prompts
+ask for optional narrative context. These are the four fields Claude uses to anchor the entire
+plan before writing a single slide:
+
+| Field | What it is | Example |
+|---|---|---|
+| `topic` | A short noun phrase (3-6 words, no verb) for the deck subject | "Q2 readiness and IT decisions" |
+| `deck_objective` | One sentence: what this deck is FOR and FOR WHOM | "Brief the CFO on Q2 audit readiness and unblock three IT decisions." |
+| `single_sentence_takeaway` | The whole argument in one punchy line | "We are on track for Q1 audit but Q2 products risk a 4-week slip without three approvals." |
+| `final_ask` | The specific decision or action the audience must take | "Approve Tom Kistinger as Data Owner, confirm IT date, authorize Fabric capacity." |
+
+**Claude always derives these from the source document.** You do not need to provide them. But when
+you fill them in — especially `deck_objective` and `final_ask` — Claude generates sharper action
+titles, tighter takeaway lines, and a more focused slide sequence.
+
+> **Rule of thumb:** If you know exactly what decision you want from the audience, write it as
+> `final_ask`. If the deck is purely informational with no specific ask, leave it blank.
+
+To supply them via `--meta` file (no interactive prompts):
+
+```json
+{
+  "deck_objective":           "Brief the CFO on Q2 readiness and unblock three IT decisions.",
+  "single_sentence_takeaway": "We are on track for Q1 audit but Q2 data products risk a 4-week slip without three approvals.",
+  "final_ask":                "Approve Tom Kistinger as Data Owner, confirm IT date, authorize Fabric capacity."
+}
+```
+
+---
+
 ## 1. Choosing Your Region and Division
 
 Set `meta.region` to match your audience — this controls the legal disclaimer and template file.

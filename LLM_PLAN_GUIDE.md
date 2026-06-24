@@ -40,6 +40,11 @@ has multiple sections; omit for single-topic decks.
     "show_disclaimer": false,             // Optional. Show legal disclaimer footer text.
     "division":        "merck",           // Optional. Controls template file (see §7).
     "cover_top_bar":   false,             // Optional. Show a colored bar at top of cover.
+    // Narrative context — optional; LLM always derives from source if absent.
+    "topic":                    "Q2 readiness and IT decisions",  // Optional. Short noun phrase (3-6 words, no verb).
+    "deck_objective":           "Brief the CFO on Q2 readiness and unblock three decisions.",  // Optional. One sentence: what this deck is FOR and FOR WHOM.
+    "single_sentence_takeaway": "We are on track for Q1 audit but Q2 products risk a 4-week slip without three approvals.",  // Optional. The whole argument in one line.
+    "final_ask":                "Approve Tom Kistinger as Data Owner, confirm IT date, authorize Fabric capacity.",  // Optional. Decision/action requested; null for informational decks.
     "chrome": {                           // Optional. Opt-in custom chrome (all default false).
       "progress_bar":         false,      //   Proportional fill strip at top of content slides.
       "section_circles":      false,      //   Numbered purple circles + category tag (top-left).

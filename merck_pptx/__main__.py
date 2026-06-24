@@ -96,7 +96,17 @@ def _ask_meta() -> dict:
 
     deck_label = input("\nDeck label / title (appears in footer) [Merck Presentation]: ").strip() or "Merck Presentation"
 
-    return {
+    # Optional narrative context — helps Claude generate sharper plans.
+    # Press Enter to skip; the LLM will derive these from the source document.
+    print("\nNarrative context (optional — press Enter to skip each):")
+    deck_objective = input(
+        "  Deck objective: what is this deck FOR and FOR WHOM? "
+    ).strip()
+    final_ask = input(
+        "  Final ask: decision or action the audience must take? "
+    ).strip()
+
+    meta: dict = {
         "region":          region,
         "division":        division,
         "deck_label":      deck_label,
@@ -107,6 +117,11 @@ def _ask_meta() -> dict:
         "variety_mode":    variety,
         "show_disclaimer": False,
     }
+    if deck_objective:
+        meta["deck_objective"] = deck_objective
+    if final_ask:
+        meta["final_ask"] = final_ask
+    return meta
 
 
 _VALID_META_REGIONS          = {"EU", "USA"}

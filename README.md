@@ -160,6 +160,8 @@ There is a sixth parameter, `variety_mode`, but for most decks you do not need t
 
 The interactive flow covers the most common settings. One parameter it does **not** ask for is `color_theme` (and for EU, `division` when you need Asia/China branding). To set these, pass a `--meta` JSON file.
 
+The interactive flow also offers two optional narrative context prompts at the end — you can skip them by pressing Enter and Claude will derive them from the source document.
+
 ### Full `--meta` reference
 
 Create a JSON file with any combination of the fields below and pass it with `--meta`. Fields you omit fall back to sensible defaults.
@@ -175,9 +177,16 @@ Create a JSON file with any combination of the fields below and pass it with `--
   "color_theme":     "organic",
   "variety_mode":    "default",
   "deck_label":      "Q2 Business Review",
-  "show_disclaimer": false
+  "show_disclaimer": false,
+
+  "topic":                    "Q2 readiness and IT handover decisions",
+  "deck_objective":           "Brief the CFO on Q2 readiness and unblock three IT decisions.",
+  "single_sentence_takeaway": "We are on track for Q1 audit but Q2 products risk a 4-week slip without three approvals.",
+  "final_ask":                "Approve Tom Kistinger as Data Owner, confirm IT date, authorize Fabric capacity."
 }
 ```
+
+The four `topic` / `deck_objective` / `single_sentence_takeaway` / `final_ask` fields are **optional** — Claude always derives them from the source document if they are absent. When you supply them yourself (because you know exactly what the deck should argue and what you want the audience to decide), Claude produces sharper action titles, tighter takeaway lines, and a more coherent slide sequence.
 
 Use this with any input type:
 
